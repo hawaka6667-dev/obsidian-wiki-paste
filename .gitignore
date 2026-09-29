@@ -6,3 +6,4 @@ node_modules/
 /table.md
 /test.md
 /.github/skills/
+/.dist/[0-9]*/

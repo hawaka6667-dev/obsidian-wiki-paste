@@ -23,15 +23,21 @@ $targetVaultPaths = switch ($Target) {
     'Main' { @($mainVaultPath) }
     'Both' { @($testVaultPath, $mainVaultPath) }
 }
-$manifestPath = Join-Path $testVaultPath 'manifest.json'
-$bundlePath = Join-Path $testVaultPath 'main.js'
+$sourceManifestPath = Join-Path $testVaultPath 'src\manifest.json'
+if (-not (Test-Path -LiteralPath $sourceManifestPath)) {
+    throw "Plugin manifest source not found: $sourceManifestPath"
+}
+$sourceManifest = Get-Content -LiteralPath $sourceManifestPath -Raw | ConvertFrom-Json
+$releasePath = Join-Path (Join-Path $testVaultPath '.dist') ([string]$sourceManifest.version)
+$manifestPath = Join-Path $releasePath 'manifest.json'
+$bundlePath = Join-Path $releasePath 'main.js'
 $vaultRegistryPath = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'obsidian\obsidian.json'
 
 if (-not (Test-Path -LiteralPath $manifestPath)) {
-    throw "Plugin manifest not found: $manifestPath"
+    throw "Versioned build manifest not found: $manifestPath. Run .dist/build.ps1 first."
 }
 if (-not (Test-Path -LiteralPath $bundlePath)) {
-    throw "Build output not found: $bundlePath. Run scripts/build.ps1 first."
+    throw "Build output not found: $bundlePath. Run .dist/build.ps1 first."
 }
 if (-not (Test-Path -LiteralPath $vaultRegistryPath)) {
     throw "Obsidian vault registry not found: $vaultRegistryPath"

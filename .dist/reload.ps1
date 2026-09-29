@@ -18,7 +18,9 @@ if (Test-Path -LiteralPath $configPath) {
 else {
     $mainVaultPath = 'E:\GameDevVault'
 }
-$manifestPath = Join-Path $testVaultPath 'manifest.json'
+$sourceManifestPath = Join-Path $testVaultPath 'src\manifest.json'
+$sourceManifest = Get-Content -LiteralPath $sourceManifestPath -Raw | ConvertFrom-Json
+$manifestPath = Join-Path (Join-Path $testVaultPath '.dist') "$($sourceManifest.version)\manifest.json"
 $vaultRegistryPath = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'obsidian\obsidian.json'
 
 if (-not (Test-Path -LiteralPath $manifestPath)) {
@@ -128,7 +130,7 @@ foreach ($vaultRoot in $targets) {
 
     $enabledIds = @($enabledPlugins | ForEach-Object { [string]$_.id })
     if ($enabledIds -notcontains [string]$manifest.id) {
-        $failures += "Plugin '$($manifest.id)' is not loaded as enabled in '$vaultRoot'. For a first install, run scripts/distribute.ps1 and restart Obsidian once so it scans the new plugin folder."
+        $failures += "Plugin '$($manifest.id)' is not loaded as enabled in '$vaultRoot'. For a first install, run .dist/distribute.ps1 and restart Obsidian once so it scans the new plugin folder."
         continue
     }
 

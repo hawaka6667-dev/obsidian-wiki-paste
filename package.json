@@ -1,8 +1,8 @@
 {
   "name": "wiki-paste",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --external:obsidian --platform=browser --format=cjs --target=es2020 --outfile=main.js",
+    "build": "node .dist/build.mjs",
     "test": "tsx --test",
     "typecheck": "tsc --noEmit"
   },
