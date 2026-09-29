@@ -125,25 +125,6 @@ foreach ($targetVaultPath in $targetVaultPaths) {
         throw "The distributed bundle hash does not match the source for '$targetVaultPath'."
     }
 
-    $communityPluginsPath = Join-Path $targetVaultPath '.obsidian\community-plugins.json'
-    $enabledIds = @()
-    if (Test-Path -LiteralPath $communityPluginsPath) {
-        try {
-            $enabledIds = @((Get-Content -LiteralPath $communityPluginsPath -Raw | ConvertFrom-Json))
-        }
-        catch {
-            throw "Could not parse enabled plugin list '$communityPluginsPath': $($_.Exception.Message)"
-        }
-    }
-
-    if ($enabledIds -notcontains [string]$manifest.id) {
-        $enabledIds += [string]$manifest.id
-        $temporarySettingsPath = "$communityPluginsPath.tmp"
-        $enabledJson = ConvertTo-Json -InputObject ([string[]]$enabledIds)
-        Set-Content -LiteralPath $temporarySettingsPath -Value $enabledJson -Encoding UTF8
-        Move-Item -LiteralPath $temporarySettingsPath -Destination $communityPluginsPath -Force
-    }
-
     $installedOutput = & $cli "vault=$vaultId" plugins filter=community format=json 2>&1
     $installedExitCode = $LASTEXITCODE
     $installedText = $installedOutput -join [Environment]::NewLine
@@ -162,7 +143,7 @@ foreach ($targetVaultPath in $targetVaultPaths) {
     Write-Host "Distributed '$($manifest.id)' to '$targetVaultPath'."
     Write-Host "Bundle SHA-256: $sourceHash"
     if (-not $isKnownToRuntime) {
-        Write-Host "Added '$($manifest.id)' to the enabled plugin list. Restart Obsidian once so it scans the newly copied plugin files."
+        Write-Host "Plugin files were copied. Restart Obsidian once so it scans the new plugin folder; reload was skipped and the enabled state was not changed."
         continue
     }
 
@@ -182,22 +163,16 @@ foreach ($targetVaultPath in $targetVaultPaths) {
 
     $isRuntimeEnabled = @($runtimeEnabledPlugins | ForEach-Object { [string]$_.id }) -contains [string]$manifest.id
     if (-not $isRuntimeEnabled) {
-        $enableOutput = & $cli "vault=$vaultId" plugin:enable "id=$($manifest.id)" filter=community 2>&1
-        $enableExitCode = $LASTEXITCODE
-        $enableText = $enableOutput -join [Environment]::NewLine
-        if ($enableExitCode -ne 0 -or $enableText -match '(?m)^Error:') {
-            throw "Plugin files were distributed, but Obsidian could not enable '$($manifest.id)': $enableText"
-        }
-
-        $verifyOutput = & $cli "vault=$vaultId" plugins:enabled filter=community format=json 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            throw "Obsidian CLI could not verify that '$($manifest.id)' was enabled."
-        }
-        $verifiedEnabledIds = @((($verifyOutput -join [Environment]::NewLine) | ConvertFrom-Json) | ForEach-Object { [string]$_.id })
-        if ($verifiedEnabledIds -notcontains [string]$manifest.id) {
-            throw "Obsidian CLI did not confirm that '$($manifest.id)' was enabled."
-        }
+        Write-Host "Plugin '$($manifest.id)' remains disabled in '$targetVaultPath'; reload was skipped."
+        continue
     }
 
-    Write-Host "Plugin '$($manifest.id)' is enabled in '$targetVaultPath'."
+    $reloadTarget = if ($targetVaultPath -ieq $testVaultPath) { 'Test' } else { 'Main' }
+    $reloadScriptPath = Join-Path $PSScriptRoot 'reload.ps1'
+    if (-not (Test-Path -LiteralPath $reloadScriptPath)) {
+        throw "Reload script not found: $reloadScriptPath"
+    }
+
+    Write-Host "Reloading enabled plugin '$($manifest.id)' in '$targetVaultPath'."
+    & $reloadScriptPath -Target $reloadTarget -ObsidianCliPath $cli
 }

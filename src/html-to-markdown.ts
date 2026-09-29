@@ -3,7 +3,17 @@ import { gfm } from "turndown-plugin-gfm";
 
 function addEmptyHeadersToTables(document: Document): void {
   for (const table of Array.from(document.querySelectorAll("table"))) {
-    if (table.querySelector("thead")) {
+    const existingHeaderRow = table.tHead?.rows.item(0);
+    if (existingHeaderRow) {
+      const headerColumnCount = Array.from(existingHeaderRow.cells).reduce((count, cell) => count + cell.colSpan, 0);
+      const bodyRows = Array.from(table.rows).filter((row) => !table.tHead?.contains(row));
+      const rowHeaderRow = bodyRows.find((row) => row.cells.item(0)?.tagName === "TH");
+      if (rowHeaderRow) {
+        const rowColumnCount = Array.from(rowHeaderRow.cells).reduce((count, cell) => count + cell.colSpan, 0);
+        for (let index = headerColumnCount; index < rowColumnCount; index += 1) {
+          existingHeaderRow.insertBefore(document.createElement("th"), existingHeaderRow.firstChild);
+        }
+      }
       continue;
     }
 

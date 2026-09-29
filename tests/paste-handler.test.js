@@ -70,6 +70,19 @@ test("converts rich HTML tables to Markdown while preserving linked regex text",
   assert.equal(event.calls.stopped, true);
 });
 
+test("pads table headers for a leading row-header column", () => {
+  const columnHeaders = Array.from({ length: 16 }, (_, index) => `<th>${index.toString(16).toUpperCase()}</th>`).join("");
+  const values = Array.from({ length: 16 }, (_, index) => `<td>${index.toString(16).toUpperCase()}</td>`).join("");
+  const html = `<table><thead><tr>${columnHeaders}</tr></thead><tbody><tr><th>0x</th>${values}</tr></tbody></table>`;
+  const event = createPasteEvent("copied table", true, html);
+  const view = createView(event.target);
+
+  assert.equal(handleEditorPaste(event, view), true);
+  const rows = view.inserted[0].split("\n");
+  assert.equal(rows[0].split("|").length, rows[2].split("|").length);
+  assert.equal(rows[0].split("|")[1].trim(), "");
+});
+
 test("escapes a pipe inside a linked table cell without corrupting adjacent links", () => {
   const url = "https://regexone.com/lesson/conditionals";
   const html = `<table><tbody>
