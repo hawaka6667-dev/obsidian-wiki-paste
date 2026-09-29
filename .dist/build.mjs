@@ -6,7 +6,7 @@ import { build } from "esbuild";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const distRoot = path.join(repoRoot, ".dist");
 const packageJson = JSON.parse(await readFile(path.join(repoRoot, "package.json"), "utf8"));
-const manifestPath = path.join(repoRoot, "src", "manifest.json");
+const manifestPath = path.join(repoRoot, "manifest.json");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 
 if (packageJson.version !== manifest.version) {

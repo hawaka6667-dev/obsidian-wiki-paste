@@ -23,7 +23,7 @@ $targetVaultPaths = switch ($Target) {
     'Main' { @($mainVaultPath) }
     'Both' { @($testVaultPath, $mainVaultPath) }
 }
-$sourceManifestPath = Join-Path $testVaultPath 'src\manifest.json'
+$sourceManifestPath = Join-Path $testVaultPath 'manifest.json'
 if (-not (Test-Path -LiteralPath $sourceManifestPath)) {
     throw "Plugin manifest source not found: $sourceManifestPath"
 }

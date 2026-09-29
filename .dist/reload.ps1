@@ -18,7 +18,7 @@ if (Test-Path -LiteralPath $configPath) {
 else {
     $mainVaultPath = 'E:\GameDevVault'
 }
-$sourceManifestPath = Join-Path $testVaultPath 'src\manifest.json'
+$sourceManifestPath = Join-Path $testVaultPath 'manifest.json'
 $sourceManifest = Get-Content -LiteralPath $sourceManifestPath -Raw | ConvertFrom-Json
 $manifestPath = Join-Path (Join-Path $testVaultPath '.dist') "$($sourceManifest.version)\manifest.json"
 $vaultRegistryPath = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'obsidian\obsidian.json'
