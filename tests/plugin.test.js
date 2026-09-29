@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const test = require("node:test");
 
-test("registers a capture-phase paste listener and respects the setting", async () => {
+test("registers literal plain-text paste and migrates the old setting", async () => {
   const originalLoad = Module._load;
   const originalDocument = global.document;
   const documentTarget = {};
@@ -11,7 +11,7 @@ test("registers a capture-phase paste listener and respects the setting", async 
 
   class MockPlugin {
     loadData() {
-      return Promise.resolve(undefined);
+      return Promise.resolve({ escapeFootnoteReferences: false });
     }
 
     addSettingTab(tab) {
@@ -70,6 +70,7 @@ test("registers a capture-phase paste listener and respects the setting", async 
   try {
     const WikiPastePlugin = require("../src/main.ts").default;
     const plugin = new WikiPastePlugin();
+    plugin.loadData = () => Promise.resolve({ escapeFootnoteReferences: false });
     const target = { closest: (selector) => selector === ".cm-content" ? target : null };
     const inserted = [];
     const view = {
@@ -86,12 +87,12 @@ test("registers a capture-phase paste listener and respects the setting", async 
     plugin.app = { workspace: { getActiveViewOfType: () => view } };
 
     await plugin.onload();
-    assert.equal(plugin.settings.escapeFootnoteReferences, true);
+    assert.equal(plugin.settings.escapeMarkdownSyntax, false);
     plugin.settingTab.display();
-    assert.equal(settingToggle.value, true);
+    assert.equal(settingToggle.value, false);
     await settingToggle.handler(false);
-    assert.equal(plugin.settings.escapeFootnoteReferences, false);
-    assert.equal(plugin.savedData.escapeFootnoteReferences, false);
+    assert.equal(plugin.settings.escapeMarkdownSyntax, false);
+    assert.equal(plugin.savedData.escapeMarkdownSyntax, false);
 
     assert.equal(registered[0], documentTarget);
     assert.equal(registered[1], "paste");
@@ -104,7 +105,7 @@ test("registers a capture-phase paste listener and respects the setting", async 
 
     await settingToggle.handler(true);
     registered[2](event);
-    assert.deepEqual(inserted, ["Copied \\[^abc\\]"]);
+    assert.deepEqual(inserted, ["Copied \\[^abc]"]);
     assert.equal(eventState.prevented, true);
     assert.equal(eventState.stopped, true);
   } finally {

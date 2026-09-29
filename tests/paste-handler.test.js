@@ -1,5 +1,11 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const { JSDOM } = require("jsdom");
+
+const dom = new JSDOM("");
+global.document = dom.window.document;
+global.DOMParser = dom.window.DOMParser;
+
 const { handleEditorPaste } = require("../src/paste-handler.ts");
 
 function createPasteEvent(text, inEditor = true, html = "") {
@@ -29,18 +35,18 @@ function createView(target) {
   };
 }
 
-test("converts and inserts a collision from a real paste event", () => {
-  const event = createPasteEvent("Copied [^abc] text");
+test("converts Markdown syntax to literal text in a plain-text paste event", () => {
+  const event = createPasteEvent("# Copied [^abc]");
   const view = createView(event.target);
 
   assert.equal(handleEditorPaste(event, view), true);
-  assert.deepEqual(view.inserted, ["Copied \\[^abc\\] text"]);
+  assert.deepEqual(view.inserted, ["\\# Copied \\[^abc]"]);
   assert.equal(event.calls.prevented, true);
   assert.equal(event.calls.stopped, true);
 });
 
-test("leaves native paste alone when there is no collision", () => {
-  const event = createPasteEvent("[[abc]] and [abc](url)");
+test("leaves native paste alone when plain text has no Markdown punctuation", () => {
+  const event = createPasteEvent("plain words 123");
   const view = createView(event.target);
 
   assert.equal(handleEditorPaste(event, view), false);
@@ -48,14 +54,20 @@ test("leaves native paste alone when there is no collision", () => {
   assert.equal(event.calls.prevented, false);
 });
 
-test("leaves rich HTML paste to Obsidian even when plain text contains a collision", () => {
-  const event = createPasteEvent("Title [^abc]", true, "<table><tr><td>Title [^abc]</td></tr></table>");
+test("converts rich HTML tables to Markdown while preserving linked regex text", () => {
+  const html = `<table><tbody>
+    <tr><td><a href="https://regexone.com/matching">[abc]</a></td><td>Only a, b, or c</td></tr>
+    <tr><td><a href="https://regexone.com/digit">\\d</a></td><td>Any Digit</td></tr>
+  </tbody></table>`;
+  const event = createPasteEvent("[abc] Any Digit", true, html);
   const view = createView(event.target);
 
-  assert.equal(handleEditorPaste(event, view), false);
-  assert.deepEqual(view.inserted, []);
-  assert.equal(event.calls.prevented, false);
-  assert.equal(event.calls.stopped, false);
+  assert.equal(handleEditorPaste(event, view), true);
+  assert.deepEqual(view.inserted, [
+    "|  |  |\n| --- | --- |\n| [\\[abc\\]](https://regexone.com/matching) | Only a, b, or c |\n| [\\\\d](https://regexone.com/digit) | Any Digit |",
+  ]);
+  assert.equal(event.calls.prevented, true);
+  assert.equal(event.calls.stopped, true);
 });
 
 test("ignores paste events outside the editor", () => {

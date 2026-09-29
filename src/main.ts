@@ -2,20 +2,29 @@ import { MarkdownView, Plugin, PluginSettingTab, Setting, type App } from "obsid
 import { handleEditorPaste } from "./paste-handler";
 
 interface WikiPasteSettings {
-  escapeFootnoteReferences: boolean;
+  escapeMarkdownSyntax: boolean;
 }
 
-const DEFAULT_SETTINGS: WikiPasteSettings = { escapeFootnoteReferences: true };
+interface StoredWikiPasteSettings extends Partial<WikiPasteSettings> {
+  escapeFootnoteReferences?: boolean;
+}
+
+const DEFAULT_SETTINGS: WikiPasteSettings = { escapeMarkdownSyntax: true };
 
 export default class WikiPastePlugin extends Plugin {
   settings!: WikiPasteSettings;
 
   async onload(): Promise<void> {
-    this.settings = { ...DEFAULT_SETTINGS, ...await this.loadData() };
+    const savedSettings = await this.loadData() as StoredWikiPasteSettings | null;
+    this.settings = {
+      escapeMarkdownSyntax: savedSettings?.escapeMarkdownSyntax
+        ?? savedSettings?.escapeFootnoteReferences
+        ?? DEFAULT_SETTINGS.escapeMarkdownSyntax,
+    };
     this.addSettingTab(new WikiPasteSettingTab(this.app, this));
 
     this.registerDomEvent(document, "paste", (event: ClipboardEvent) => {
-      if (!this.settings.escapeFootnoteReferences) {
+      if (!this.settings.escapeMarkdownSyntax) {
         return;
       }
 
@@ -27,8 +36,8 @@ export default class WikiPastePlugin extends Plugin {
     }, { capture: true });
   }
 
-  async setFootnoteEscapingEnabled(enabled: boolean): Promise<void> {
-    this.settings.escapeFootnoteReferences = enabled;
+  async setMarkdownEscapingEnabled(enabled: boolean): Promise<void> {
+    this.settings.escapeMarkdownSyntax = enabled;
     await this.saveData(this.settings);
   }
 }
@@ -46,10 +55,10 @@ class WikiPasteSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName("Escape footnote references")
-      .setDesc("Prevent copied [^label] text from being parsed as an Obsidian footnote.")
+      .setName("Preserve copied content on paste")
+      .setDesc("Convert rich HTML clipboard content to Markdown and escape syntax in plain-text content.")
       .addToggle((toggle) => toggle
-        .setValue(this.plugin.settings.escapeFootnoteReferences)
-        .onChange((enabled) => this.plugin.setFootnoteEscapingEnabled(enabled)));
+        .setValue(this.plugin.settings.escapeMarkdownSyntax)
+        .onChange((enabled) => this.plugin.setMarkdownEscapingEnabled(enabled)));
   }
 }

@@ -1,5 +1,6 @@
 import { MarkdownView } from "obsidian";
-import { escapeFootnoteReferences } from "./compatibility";
+import { escapeMarkdownSyntax } from "./compatibility";
+import { htmlToMarkdown } from "./html-to-markdown";
 
 export function handleEditorPaste(event: ClipboardEvent, view: MarkdownView): boolean {
   const target = event.target as Element | null;
@@ -9,20 +10,17 @@ export function handleEditorPaste(event: ClipboardEvent, view: MarkdownView): bo
   }
 
   const clipboardHtml = event.clipboardData?.getData("text/html");
-
-  if (clipboardHtml) {
-    return false;
-  }
-
   const clipboardText = event.clipboardData?.getData("text/plain");
 
-  if (typeof clipboardText !== "string") {
+  if (!clipboardHtml && typeof clipboardText !== "string") {
     return false;
   }
 
-  const convertedText = escapeFootnoteReferences(clipboardText);
+  const convertedText = clipboardHtml
+    ? htmlToMarkdown(clipboardHtml)
+    : escapeMarkdownSyntax(clipboardText!);
 
-  if (convertedText === clipboardText) {
+  if (!convertedText || convertedText === clipboardText) {
     return false;
   }
 
