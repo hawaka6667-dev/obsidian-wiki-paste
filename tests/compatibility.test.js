@@ -116,3 +116,8 @@ test("prevents a Markdown table block from rendering while preserving its cell t
 test("leaves plain text without Markdown punctuation unchanged", () => {
   assert.equal(escapeMarkdownSyntax("plain words 123"), "plain words 123");
 });
+
+test("preserves LF and CRLF line endings without requiring lookbehind", () => {
+  assert.equal(escapeMarkdownSyntax("- first\n# second\r\n"), "\\- first\n\\# second\r\n");
+  assert.equal(escapeMarkdownSyntax(""), "");
+});

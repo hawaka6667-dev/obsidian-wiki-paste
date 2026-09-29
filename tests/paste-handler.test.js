@@ -70,6 +70,41 @@ test("converts rich HTML tables to Markdown while preserving linked regex text",
   assert.equal(event.calls.stopped, true);
 });
 
+test("escapes a pipe inside a linked table cell without corrupting adjacent links", () => {
+  const url = "https://regexone.com/lesson/conditionals";
+  const html = `<table><tbody>
+    <tr><td><a href="${url}" title="Lesson 14: It's all conditional">(abc|def)</a></td></tr>
+    <tr><td><a href="${url}">Matches abc or def</a></td></tr>
+  </tbody></table>`;
+  const event = createPasteEvent("[(abc|def)](url)", true, html);
+  const view = createView(event.target);
+
+  assert.equal(handleEditorPaste(event, view), true);
+  assert.deepEqual(view.inserted, [
+    `|  |\n| --- |\n| [(abc\\|def)](${url} "Lesson 14: It's all conditional") |\n| [Matches abc or def](${url}) |`,
+  ]);
+  assert.equal(event.calls.prevented, true);
+  assert.equal(event.calls.stopped, true);
+});
+
+test("distinguishes table separators from multiple pipes in varied cell content", () => {
+  const html = `<table><thead><tr><th>Pattern</th><th>Notes</th><th>Code</th></tr></thead><tbody>
+    <tr>
+      <td><a href="https://x.test/pipes" title="pipe|title">(a|b||c)</a></td>
+      <td>left|middle|right</td>
+      <td><code>x|y||z</code></td>
+    </tr>
+    <tr><td><a href="https://x.test/edges">(x|y)</a></td><td>&#124;edges&#124;</td><td>slash \\| pipe</td></tr>
+  </tbody></table>`;
+  const event = createPasteEvent("copied table", true, html);
+  const view = createView(event.target);
+
+  assert.equal(handleEditorPaste(event, view), true);
+  assert.deepEqual(view.inserted, [
+    "| Pattern | Notes | Code |\n| --- | --- | --- |\n| [(a\\|b\\|\\|c)](https://x.test/pipes \"pipe\\|title\") | left\\|middle\\|right | `x\\|y\\|\\|z` |\n| [(x\\|y)](https://x.test/edges) | \\|edges\\| | slash \\\\\\| pipe |",
+  ]);
+});
+
 test("ignores paste events outside the editor", () => {
   const event = createPasteEvent("[^abc]", false);
   const view = createView(event.target);

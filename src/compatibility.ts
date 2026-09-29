@@ -355,7 +355,7 @@ function preserveIndentedCodeText(indentation: string): string {
 }
 
 export function escapeMarkdownSyntax(text: string): string {
-  const lines = text.split(/(?<=\n)/);
+  const lines = text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
   const contents = lines.map((line) => line.replace(/\r?\n$/, ""));
   const tableLines = new Set<number>();
 

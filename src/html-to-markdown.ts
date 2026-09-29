@@ -29,6 +29,25 @@ function addEmptyHeadersToTables(document: Document): void {
   }
 }
 
+function escapeTableCellPipes(content: string): string {
+  let output = "";
+
+  for (const character of content) {
+    if (character === "|") {
+      let precedingBackslashes = 0;
+      for (let index = output.length - 1; index >= 0 && output[index] === "\\"; index -= 1) {
+        precedingBackslashes += 1;
+      }
+      if (precedingBackslashes % 2 === 0) {
+        output += "\\";
+      }
+    }
+    output += character;
+  }
+
+  return output;
+}
+
 export function htmlToMarkdown(html: string): string {
   const document = new DOMParser().parseFromString(html, "text/html");
   addEmptyHeadersToTables(document);
@@ -40,6 +59,15 @@ export function htmlToMarkdown(html: string): string {
     linkStyle: "inlined",
   });
   converter.use(gfm);
+  converter.addRule("tableCellPipes", {
+    filter: ["th", "td"],
+    replacement: (content, node) => {
+      const cells = node.parentElement?.children;
+      const cellIndex = cells ? Array.prototype.indexOf.call(cells, node) : 0;
+      const prefix = cellIndex === 0 ? "| " : " ";
+      return `${prefix}${escapeTableCellPipes(content)} |`;
+    },
+  });
 
   return converter.turndown(document.body).trim();
 }
