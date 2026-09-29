@@ -1,0 +1,8 @@
+node_modules/
+.obsidian/
+.mcp.json
+/.publish-config.json
+/helper.md
+/table.md
+/test.md
+/.github/skills/

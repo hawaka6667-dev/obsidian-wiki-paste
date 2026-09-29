@@ -1,0 +1,9 @@
+{
+  "id": "wiki-paste",
+  "name": "Wiki Paste",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Preserve copied wiki text when pasting into Obsidian Markdown.",
+  "author": "hawaka6667-dev",
+  "isDesktopOnly": false
+}
