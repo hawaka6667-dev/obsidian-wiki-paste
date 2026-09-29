@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -29,3 +29,12 @@ await copyFile(
 	manifestPath,
 	path.join(versionPath, "manifest.json"),
 );
+
+const staleVersionDirectories = (await readdir(distRoot, { withFileTypes: true }))
+	.filter((entry) => entry.isDirectory()
+		&& entry.name !== manifest.version
+		&& /^\d+(?:\.\d+)+(?:[-+][0-9A-Za-z.-]+)?$/.test(entry.name));
+
+await Promise.all(staleVersionDirectories.map((entry) =>
+	rm(path.join(distRoot, entry.name), { recursive: true, force: true }),
+));
