@@ -32,6 +32,10 @@
     { "x": "[[abc]](https://regexone.com/lesson/matching_characters \"Lesson 3: Matching specific characters\")", "fx": "[\\[abc\\]](https://regexone.com/lesson/matching_characters \"Lesson 3: Matching specific characters\")" },
     { "x": "[[^abc]](https://regexone.com/lesson/excluding_characters \"Lesson 4: Excluding specific characters\")", "fx": "[\\[^abc\\]](https://regexone.com/lesson/excluding_characters \"Lesson 4: Excluding specific characters\")" },
     { "x": "[[a-z]](https://regexone.com/lesson/character_ranges \"Lesson 5: Character ranges\")", "fx": "[\\[a-z\\]](https://regexone.com/lesson/character_ranges \"Lesson 5: Character ranges\")" },
-    { "x": "[[0-9]](https://regexone.com/lesson/character_ranges \"Lesson 5: Character ranges\")", "fx": "[\\[0-9\\]](https://regexone.com/lesson/character_ranges \"Lesson 5: Character ranges\")" }
+    { "x": "[[0-9]](https://regexone.com/lesson/character_ranges \"Lesson 5: Character ranges\")", "fx": "[\\[0-9\\]](https://regexone.com/lesson/character_ranges \"Lesson 5: Character ranges\")" },
+    {
+      "x": "SI\", \"ESC [\") from [ECMA-48](https://en.wikipedia.org/wiki/ECMA-48 \"ECMA-48\") (1972) and its successors. Some escape sequences do not have introducers, like the \"Reset to Initial State\", \"RIS\" command \"ESC c\".[[41]](https://en.wikipedia.org/wiki/ASCII#cite_note-42)",
+      "expected": "SI\", \"ESC \\[\") from [ECMA-48](https://en.wikipedia.org/wiki/ECMA-48 \"ECMA-48\") (1972) and its successors. Some escape sequences do not have introducers, like the \"Reset to Initial State\", \"RIS\" command \"ESC c\".[\\[41\\]](https://en.wikipedia.org/wiki/ASCII#cite_note-42)"
+    }
   ]
 }

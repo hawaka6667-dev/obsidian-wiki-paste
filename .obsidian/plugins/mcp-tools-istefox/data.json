@@ -1,0 +1,86 @@
+{
+  "toolLoading": {
+    "profile": "all",
+    "promoted": [],
+    "counters": {
+      "get_server_info": 1
+    },
+    "profiles": {
+      "default": {
+        "profile": "all",
+        "promoted": [],
+        "allowed": null
+      }
+    },
+    "everCalled": {
+      "default": [
+        "get_server_info"
+      ]
+    },
+    "everCalledSince": 1790659511270
+  },
+  "mcpTransport": {
+    "tokens": [
+      {
+        "id": "default",
+        "label": "Default",
+        "token": "r0hfj6PR1j8VG6N15dPCZHlRd2jDvn85_A-nT6rRX8k",
+        "createdAt": 1790659511235
+      }
+    ],
+    "bearerToken": "r0hfj6PR1j8VG6N15dPCZHlRd2jDvn85_A-nT6rRX8k",
+    "livePort": 27201,
+    "eraCounters": {
+      "legacy": 6,
+      "modern": 0
+    },
+    "eraCountersByToken": {
+      "default": {
+        "legacy": 6,
+        "modern": 0
+      }
+    }
+  },
+  "semanticSearch": {
+    "provider": "auto",
+    "indexingMode": "live",
+    "unloadModelWhenIdle": false
+  },
+  "commandPermissions": {
+    "enabled": true,
+    "allowlist": [
+      "editor:toggle-bold",
+      "editor:toggle-strikethrough",
+      "editor:toggle-highlight",
+      "editor:toggle-code",
+      "editor:toggle-inline-math",
+      "editor:toggle-blockquote",
+      "editor:toggle-bullet-list",
+      "editor:toggle-numbered-list",
+      "editor:toggle-checklist-status",
+      "editor:toggle-comments",
+      "editor:insert-link",
+      "editor:insert-wikilink",
+      "editor:insert-embed",
+      "editor:insert-horizontal-rule",
+      "editor:insert-callout",
+      "editor:insert-tag",
+      "app:go-back",
+      "app:go-forward",
+      "editor:focus-top",
+      "editor:focus-bottom",
+      "editor:focus-left",
+      "editor:focus-right",
+      "workspace:split-vertical",
+      "workspace:split-horizontal",
+      "workspace:close",
+      "workspace:next-tab",
+      "workspace:previous-tab",
+      "graph:open",
+      "graph:open-local",
+      "global-search:open",
+      "switcher:open",
+      "file-explorer:reveal-active-file"
+    ]
+  }
+}

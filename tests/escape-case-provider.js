@@ -1,3 +1,6 @@
+// @machine:
+// Loads JSON escape cases and provides normalized fixtures to test suites.
+// Restores Markdown punctuation escapes for source-preservation assertions.
 const examples = require("./escape-cases.json");
 
 function getEscapeCases(group) {
@@ -6,7 +9,7 @@ function getEscapeCases(group) {
     throw new Error(`Unknown escape case group: ${group}`);
   }
 
-  return cases.map(({ x, fx }) => ({ input: x, referenceFx: fx }));
+  return cases.map(({ x, fx, expected }) => ({ input: x, referenceFx: fx, expectedOutput: expected }));
 }
 
 function restoreMarkdownEscapes(text) {

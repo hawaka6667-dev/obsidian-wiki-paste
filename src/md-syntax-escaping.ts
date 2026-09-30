@@ -1,6 +1,6 @@
 // @machine:
 // Scans each plain-text input for active Markdown and Obsidian syntax.
-// Post-conversion rules preserve Markdown links while escaping Obsidian syntax in their labels.
+// Post-conversion rules preserve Markdown links and escape Obsidian conflicts and unmatched brackets.
 // Sends fresh offsets to md-escape-optimization.ts and preserves source line endings.
 // 这里只维护和优化转换规则，规则要求是提炼出对应ob符号的那种基本逻辑，以后还会提供更多case
 import { isMarkdownEscapablePunctuation, optimizeMarkdownEscapes } from "./md-escape-optimization";
@@ -159,12 +159,39 @@ interface LinkLabelRange {
   end: number;
 }
 
+interface MarkdownLinkRange {
+  start: number;
+  end: number;
+}
+
 function isInsideRange(index: number, ranges: Array<{ start: number; end: number }>): boolean {
   return ranges.some((range) => index >= range.start && index < range.end);
 }
 
-function collectMarkdownLinkLabels(line: string, codeRanges: Array<{ start: number; end: number }>): LinkLabelRange[] {
+function findMarkdownLinkEnd(line: string, openingParenthesis: number, codeRanges: Array<{ start: number; end: number }>): number {
+  let depth = 0;
+
+  for (let index = openingParenthesis; index < line.length; index += 1) {
+    if (isInsideRange(index, codeRanges) || isEscapedByBackslash(line, index)) {
+      continue;
+    }
+
+    if (line[index] === "(") {
+      depth += 1;
+    } else if (line[index] === ")") {
+      depth -= 1;
+      if (depth === 0) {
+        return index + 1;
+      }
+    }
+  }
+
+  return -1;
+}
+
+function collectMarkdownLinks(line: string, codeRanges: Array<{ start: number; end: number }>): { labels: LinkLabelRange[]; links: MarkdownLinkRange[] } {
   const labels: LinkLabelRange[] = [];
+  const links: MarkdownLinkRange[] = [];
 
   for (let start = 0; start < line.length; start += 1) {
     if (line[start] !== "[" || isEscapedByBackslash(line, start) || isInsideRange(start, codeRanges)) {
@@ -184,6 +211,10 @@ function collectMarkdownLinkLabels(line: string, codeRanges: Array<{ start: numb
         if (depth === 0) {
           if (line[index + 1] === "(") {
             labels.push({ start: start + 1, end: index });
+            const linkEnd = findMarkdownLinkEnd(line, index + 1, codeRanges);
+            if (linkEnd !== -1) {
+              links.push({ start, end: linkEnd });
+            }
           }
           start = index;
           break;
@@ -192,7 +223,32 @@ function collectMarkdownLinkLabels(line: string, codeRanges: Array<{ start: numb
     }
   }
 
-  return labels;
+  return { labels, links };
+}
+
+function collectUnmatchedOpeningBrackets(
+  line: string,
+  codeRanges: Array<{ start: number; end: number }>,
+  markdownLinks: MarkdownLinkRange[],
+  mark: EscapeMarker,
+): void {
+  const openings: number[] = [];
+
+  for (let index = 0; index < line.length; index += 1) {
+    if (isInsideRange(index, codeRanges)
+      || isInsideRange(index, markdownLinks)
+      || isEscapedByBackslash(line, index)) {
+      continue;
+    }
+
+    if (line[index] === "[") {
+      openings.push(index);
+    } else if (line[index] === "]" && openings.length > 0) {
+      openings.pop();
+    }
+  }
+
+  openings.forEach(mark);
 }
 
 function collectLinkLabelSyntax(
@@ -325,7 +381,7 @@ export function escapeObsidianSyntax(text: string): string {
     const syntaxContent = getSyntaxContent(content);
     const escapeCandidates = new Set<number>();
     const codeRanges = collectInlineCodeRanges(syntaxContent.content);
-    const linkLabels = collectMarkdownLinkLabels(syntaxContent.content, codeRanges);
+    const { labels: linkLabels, links: markdownLinks } = collectMarkdownLinks(syntaxContent.content, codeRanges);
     const mark: EscapeMarker = (offset) => {
       const insideInlineCode = isInsideRange(offset, codeRanges);
       if (!insideInlineCode && !isEscapedByBackslash(syntaxContent.content, offset)) {
@@ -333,6 +389,7 @@ export function escapeObsidianSyntax(text: string): string {
       }
     };
     const doubleBackslashCandidates = collectLinkLabelSyntax(syntaxContent.content, linkLabels, codeRanges, mark);
+    collectUnmatchedOpeningBrackets(syntaxContent.content, codeRanges, markdownLinks, mark);
     collectObsidianSyntax(syntaxContent.content, mark, linkLabels);
 
     return `${optimizeMarkdownEscapes(content, escapeCandidates, syntaxContent.indentationLength, true, doubleBackslashCandidates)}${lineEnding}`;
