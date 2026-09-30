@@ -1,3 +1,4 @@
+# @machine: Runs npm run typecheck from the repository root, throws on a nonzero exit code, and restores the caller's working directory.
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 

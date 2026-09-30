@@ -1,5 +1,8 @@
+// @machine:
+// Loads and migrates settings, then registers a capture-phase paste listener.
+// Delegates active MarkdownView events to md-editor-paste-handler.ts and persists changes.
 import { MarkdownView, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
-import { handleEditorPaste } from "./paste-handler";
+import { handleEditorChange, handleEditorPaste } from "./md-editor-paste-handler";
 
 interface WikiPasteSettings {
   escapeMarkdownSyntax: boolean;
@@ -34,6 +37,12 @@ export default class WikiPastePlugin extends Plugin {
         handleEditorPaste(event, view);
       }
     }, { capture: true });
+
+    this.registerEvent(this.app.workspace.on("editor-change", (editor) => {
+      if (this.settings.escapeMarkdownSyntax) {
+        handleEditorChange(editor);
+      }
+    }));
   }
 
   async setMarkdownEscapingEnabled(enabled: boolean): Promise<void> {
@@ -55,8 +64,8 @@ class WikiPasteSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName("Preserve copied content on paste")
-      .setDesc("Convert rich HTML clipboard content to Markdown and escape syntax in plain-text content.")
+      .setName("Escape pasted Markdown syntax")
+      .setDesc("Prevent Markdown and Obsidian syntax in plain-text pastes from being rendered as formatting.")
       .addToggle((toggle) => toggle
         .setValue(this.plugin.settings.escapeMarkdownSyntax)
         .onChange((enabled) => this.plugin.setMarkdownEscapingEnabled(enabled)));

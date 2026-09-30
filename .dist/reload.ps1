@@ -1,3 +1,4 @@
+# @machine: Resolves selected registered vaults, rejects path mismatches or disabled plugins, runs Obsidian CLI plugin:reload, and verifies its Reloaded confirmation.
 param(
     [ValidateSet('Test', 'Main', 'Both')]
     [string]$Target = 'Test',

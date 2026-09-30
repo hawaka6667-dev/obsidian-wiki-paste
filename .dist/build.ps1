@@ -1,3 +1,4 @@
+# @machine: Checks that node_modules exists, runs npm run build from the repository root, propagates failure, and restores the caller's working directory.
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 

@@ -1,3 +1,4 @@
+// @machine: Validates package/manifest versions, bundles src/wiki-paste-plugin-entry.ts with Obsidian external into .dist/<version>/main.js, copies the root manifest, and removes stale version folders.
 import { copyFile, mkdir, readFile, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,7 +18,7 @@ const versionPath = path.join(distRoot, manifest.version);
 
 await mkdir(versionPath, { recursive: true });
 await build({
-	entryPoints: [path.join(repoRoot, "src", "main.ts")],
+	entryPoints: [path.join(repoRoot, "src", "wiki-paste-plugin-entry.ts")],
 	bundle: true,
 	external: ["obsidian"],
 	platform: "browser",

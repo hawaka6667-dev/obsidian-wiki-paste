@@ -1,0 +1,37 @@
+{
+  "plainText": [
+    { "x": "[^abc]", "fx": "\\[^abc]" },
+    { "x": "### Heading ###", "fx": "\\### Heading ###" },
+    { "x": "- item", "fx": "\\- item -" },
+    { "x": "1. item", "fx": "1\\. item1." },
+    { "x": "[[Page]]", "fx": "\\[\\[Page]]" },
+    { "x": "**bold**", "fx": "\\*\\*bold**" },
+    { "x": "~~strike~~", "fx": "\\~~strike\\~~" },
+    { "x": "==mark==", "fx": "\\==mark\\==" },
+    { "x": "> [!note]", "fx": "\\> \\[!note]>" },
+    { "x": "$x^2$", "fx": "\\$x^2$" },
+    { "x": "<span>x</span>", "fx": "\\<span>x\\</span>" },
+    { "x": "\\.", "fx": "\\\\." },
+    { "x": "^3", "fx": "\\^3" },
+    { "x": "text #tag/sub-tag", "fx": "text \\#tag/sub-tag" },
+    { "x": "12) ordered 12)", "fx": "12\\) ordered 12)" },
+    { "x": "`inline code`", "fx": "\\`inline code\\`" },
+    { "x": "*italic* 3", "fx": "\\*italic\\*3" },
+    { "x": "* italic* 3", "fx": "\\* italic\\* 3" },
+    { "x": "text***text***text text", "fx": "text\\*\\*\\*text\\*\\*\\*text text" },
+    { "x": "---<br>", "fx": "\\---" },
+    { "x": "[label][ref]", "fx": "\\[label]\\[ref]" },
+    { "x": "[ label ][ref ]", "fx": "\\[ label ]\\[ref ]" },
+    { "x": "_italic_     _3       3  _     3", "fx": "\\_italic\\_     \\_3       3  \\_     3" },
+    { "x": "__bold__b 3b", "fx": "\\_\\_bold__b 3b" },
+    { "x": "%%comment%% 3", "fx": "\\%%comment\\%% 3" },
+    { "x": "\\\\#tag", "fx": "\\\\\\\\\\#tag" }
+  ],
+  "nativePostProcessing": [
+    { "x": "[\\.](https://regexone.com/lesson/wildcards_dot \"Lesson 2: The Dot\")", "fx": "[\\\\.](https://regexone.com/lesson/wildcards_dot \"Lesson 2: The Dot\")" },
+    { "x": "[[abc]](https://regexone.com/lesson/matching_characters \"Lesson 3: Matching specific characters\")", "fx": "[\\[abc\\]](https://regexone.com/lesson/matching_characters \"Lesson 3: Matching specific characters\")" },
+    { "x": "[[^abc]](https://regexone.com/lesson/excluding_characters \"Lesson 4: Excluding specific characters\")", "fx": "[\\[^abc\\]](https://regexone.com/lesson/excluding_characters \"Lesson 4: Excluding specific characters\")" },
+    { "x": "[[a-z]](https://regexone.com/lesson/character_ranges \"Lesson 5: Character ranges\")", "fx": "[\\[a-z\\]](https://regexone.com/lesson/character_ranges \"Lesson 5: Character ranges\")" },
+    { "x": "[[0-9]](https://regexone.com/lesson/character_ranges \"Lesson 5: Character ranges\")", "fx": "[\\[0-9\\]](https://regexone.com/lesson/character_ranges \"Lesson 5: Character ranges\")" }
+  ]
+}

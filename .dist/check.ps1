@@ -1,3 +1,4 @@
+# @machine: Runs test.ps1 followed by typecheck.ps1 from the repository root and restores the caller's working directory.
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
