@@ -1,0 +1,26 @@
+.wiki-paste-measure-height {
+  height: min-content !important;
+}
+
+.wiki-paste-measure-min-height {
+  min-height: 0 !important;
+}
+
+.wiki-paste-measure-width {
+  position: fixed !important;
+  left: -100000px !important;
+  top: 0 !important;
+  transform: none !important;
+  width: max-content !important;
+  height: max-content !important;
+  --canvas-node-width: max-content !important;
+  --canvas-node-height: max-content !important;
+}
+
+.wiki-paste-measure-width-content {
+  width: max-content !important;
+  height: max-content !important;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: visible !important;
+}

@@ -1,4 +1,4 @@
-// @machine: Validates package/manifest versions, bundles src/wiki-paste-plugin-entry.ts with Obsidian external into .dist/<version>/main.js, copies the root manifest, and retains only the two newest version folders.
+// @machine: Validates package/manifest versions, bundles src/wiki-paste-plugin-entry.ts with Obsidian external into .dist/<version>/main.js, copies the root manifest and stylesheet, and retains only the two newest version folders.
 import { copyFile, mkdir, readFile, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,6 +41,10 @@ await build({
 await copyFile(
 	manifestPath,
 	path.join(versionPath, "manifest.json"),
+);
+await copyFile(
+	path.join(repoRoot, "styles.css"),
+	path.join(versionPath, "styles.css"),
 );
 
 const versionDirectories = (await readdir(distRoot, { withFileTypes: true }))

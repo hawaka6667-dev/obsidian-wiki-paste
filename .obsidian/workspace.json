@@ -11,17 +11,14 @@
             "id": "8d7b1f4f998a417b",
             "type": "leaf",
             "state": {
-              "type": "canvas",
+              "type": "markdown",
               "state": {
-                "file": "local-testing/full-expand-wide-probe-20261004.canvas",
-                "viewState": {
-                  "x": 463.5540568886058,
-                  "y": 722.6989829170138,
-                  "zoom": -0.3333333333333334
-                }
+                "file": "test.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-layout-dashboard",
-              "title": "full-expand-wide-probe-20261004"
+              "icon": "lucide-file",
+              "title": "test"
             }
           }
         ]
@@ -193,9 +190,10 @@
   },
   "active": "8d7b1f4f998a417b",
   "lastOpenFiles": [
+    "styles.css",
+    "local-testing/full-expand-wide-probe-20261004.canvas",
     "local-testing/full-expand-after-user-paste-ab-b.png",
     "local-testing/full-expand-reference-ab-repro-20261004.canvas",
-    "local-testing/full-expand-wide-probe-20261004.canvas",
     "local-testing/full-expand-ab-run-20261004.canvas",
     "test.md",
     "local-testing/ab-canvas-escape-clean-20261004.canvas",

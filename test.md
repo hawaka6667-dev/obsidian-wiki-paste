@@ -7,12 +7,13 @@
 
 allow single canvas card copy to md的hack
 
-
+https://tool.box3.cn/editor/code.html 网页文本框
 
 Markdown escape 的==不完整行为和 &nbsp; 来源暂时排除在本任务之外
 
 正方形hack
 
+https://github.com/joeytoday/obsidian-canvas-enhance 抄作业
 ## Full expand 后续调研方向（待继续）           做成命令api
 
 - 目标：真实粘贴到 Canvas 后，卡片高度完整容纳 Markdown 内容，不出现内部滚动条；以 Obsidian 中的实际粘贴结果验收，不以合成 clipboard 事件代替。

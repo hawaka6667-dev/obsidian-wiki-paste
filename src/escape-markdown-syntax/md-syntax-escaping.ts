@@ -1,5 +1,6 @@
 // @machine:
 // 这里只维护和优化转换规则，规则要求是提炼出对应ob符号的那种基本逻辑，以后还会提供更多case
+// 因为case是无限的，所以规则必须是可组合的基本逻辑，不能是针对某个case的hack
 // Scans each plain-text input for active Markdown and Obsidian syntax.
 // Post-conversion rules preserve Markdown links and escape Obsidian conflicts and unmatched brackets.
 // Sends fresh offsets to md-escape-optimization.ts and preserves source line endings.
@@ -31,16 +32,21 @@ function isWhitespace(character: string | undefined): boolean {
 
 function collectEmphasisSyntax(line: string, marker: string, mark: EscapeMarker): void {
   const escapedMarker = marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const wordBoundaryBefore = marker === "_" ? "(?<![\\p{L}\\p{N}])" : "";
-  const wordBoundaryAfter = marker === "_" ? "(?![\\p{L}\\p{N}])" : "";
   const completeRun = `(?!${escapedMarker})`;
-  const pattern = new RegExp(
-    `${wordBoundaryBefore}(${escapedMarker}+)${completeRun}(?!\\s).*?(?<!\\s)\\1${completeRun}${wordBoundaryAfter}`,
-    "gu",
-  );
+  const pattern = marker === "_"
+    ? new RegExp(
+      `(^|[^\\p{L}\\p{N}])(${escapedMarker}+)${completeRun}(?!\\s).*?[^\\s]\\2${completeRun}(?![\\p{L}\\p{N}])`,
+      "gu",
+    )
+    : new RegExp(
+      `(${escapedMarker}+)${completeRun}(?!\\s).*?[^\\s]\\1${completeRun}`,
+      "gu",
+    );
 
   for (const match of line.matchAll(pattern)) {
-    markRun(mark, match.index, match[1].length);
+    const opening = marker === "_" ? match[2] : match[1];
+    const openingOffset = marker === "_" ? match[1].length : 0;
+    markRun(mark, match.index + openingOffset, opening.length);
   }
 }
 

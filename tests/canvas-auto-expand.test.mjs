@@ -70,7 +70,7 @@ test("native Canvas paste expands only new or changed text cards", async () => {
   editorScroller.style.height = "48px";
   Object.defineProperty(editorScroller, "scrollHeight", {
     get() {
-      return editorScroller.style.height === "min-content" ? 142 : 48;
+      return editorScroller.classList.contains("wiki-paste-measure-height") ? 142 : 48;
     },
   });
   existing.nodeEl.querySelector(".canvas-node-container").append(editorScroller);
@@ -84,7 +84,8 @@ test("native Canvas paste expands only new or changed text cards", async () => {
   preview.append(markdownSizer);
   Object.defineProperty(preview, "scrollHeight", {
     get() {
-      return preview.style.height === "min-content" && markdownSizer.style.minHeight === "0px" ? 631 : 534;
+      return preview.classList.contains("wiki-paste-measure-height")
+        && markdownSizer.classList.contains("wiki-paste-measure-min-height") ? 631 : 534;
     },
   });
   added.nodeEl.querySelector(".canvas-node-container").append(preview);

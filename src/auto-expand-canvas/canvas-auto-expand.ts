@@ -255,34 +255,26 @@ function measureNaturalContentHeight(element: HTMLElement, dimension: "clientHei
     element,
     ...Array.from(element.querySelectorAll<HTMLElement>(".markdown-preview-sizer")),
   ];
-  const previousStyles = measuredElements.map((measuredElement) => ({
+  const previousClasses = measuredElements.map((measuredElement) => ({
     element: measuredElement,
-    height: measuredElement.style.getPropertyValue("height"),
-    heightPriority: measuredElement.style.getPropertyPriority("height"),
-    minHeight: measuredElement.style.getPropertyValue("min-height"),
-    minHeightPriority: measuredElement.style.getPropertyPriority("min-height"),
+    hadHeightClass: measuredElement.classList.contains("wiki-paste-measure-height"),
+    hadMinHeightClass: measuredElement.classList.contains("wiki-paste-measure-min-height"),
   }));
 
-  for (const measuredElement of measuredElements) {
-    measuredElement.style.setProperty("height", "min-content");
-  }
+  measuredElements.forEach((measuredElement) => measuredElement.classList.add("wiki-paste-measure-height"));
   for (const measuredElement of measuredElements.slice(1)) {
-    measuredElement.style.setProperty("min-height", "0", "important");
+    measuredElement.classList.add("wiki-paste-measure-min-height");
   }
 
   try {
     return element[dimension];
   } finally {
-    for (const previousStyle of previousStyles) {
-      if (previousStyle.height) {
-        previousStyle.element.style.setProperty("height", previousStyle.height, previousStyle.heightPriority);
-      } else {
-        previousStyle.element.style.removeProperty("height");
+    for (const previousClass of previousClasses) {
+      if (!previousClass.hadHeightClass) {
+        previousClass.element.classList.remove("wiki-paste-measure-height");
       }
-      if (previousStyle.minHeight) {
-        previousStyle.element.style.setProperty("min-height", previousStyle.minHeight, previousStyle.minHeightPriority);
-      } else {
-        previousStyle.element.style.removeProperty("min-height");
+      if (!previousClass.hadMinHeightClass) {
+        previousClass.element.classList.remove("wiki-paste-measure-min-height");
       }
     }
   }
@@ -290,23 +282,12 @@ function measureNaturalContentHeight(element: HTMLElement, dimension: "clientHei
 
 function measureNaturalContentWidth(nodeElement: HTMLElement): number {
   const clone = nodeElement.cloneNode(true) as HTMLElement;
-  clone.style.position = "fixed";
-  clone.style.left = "-100000px";
-  clone.style.top = "0";
-  clone.style.transform = "none";
-  clone.style.width = "max-content";
-  clone.style.height = "max-content";
-  clone.style.setProperty("--canvas-node-width", "max-content");
-  clone.style.setProperty("--canvas-node-height", "max-content");
+  clone.classList.add("wiki-paste-measure-width");
 
   for (const element of Array.from(clone.querySelectorAll<HTMLElement>(
     ".canvas-node-container, .canvas-node-content, .markdown-preview-view, .markdown-preview-sizer, .cm-scroller",
   ))) {
-    element.style.setProperty("width", "max-content", "important");
-    element.style.setProperty("height", "max-content", "important");
-    element.style.setProperty("max-width", "none", "important");
-    element.style.setProperty("max-height", "none", "important");
-    element.style.setProperty("overflow", "visible", "important");
+    element.classList.add("wiki-paste-measure-width-content");
   }
 
   document.body.append(clone);

@@ -50,6 +50,9 @@
 - Plain text uses `escapeMarkdownSyntax`; rich HTML is handled after Obsidian's
 	native conversion with `escapeObsidianSyntax`. Canvas conversion remains
 	native; only newly added or changed text-node content is post-processed.
+- Community-plugin compatibility includes iOS versions before 16.4; syntax
+	scanning must not use JavaScript regular-expression lookbehind. Build output
+	should be checked after changes to `md-syntax-escaping.ts`.
 - Automated tests: `tests/md-syntax-escaping.test.mjs` covers syntax outputs;
 	`tests/md-editor-paste-handler.test.mjs` covers Markdown-editor external vs
 	internal paste behavior; `tests/canvas-auto-expand.test.mjs` covers external
@@ -111,9 +114,13 @@
 - `manifest.json`: root Obsidian metadata. Its version must match `package.json`
 	and both version entries in `package-lock.json`.
 - `.dist/build.mjs`: bundles `src/wiki-paste-plugin-entry.ts` with `obsidian`
-	external into `.dist/<version>/main.js` and copies the manifest.
+	external into `.dist/<version>/main.js` and copies the manifest and
+	`styles.css`.
 - `.dist/<version>/`: generated installable bundle and manifest; do not edit the
 	generated bundle directly.
+- `styles.css`: plugin-owned classes used for temporary Canvas measurement
+	styles; keep measurement behavior here instead of assigning `element.style`
+	directly.
 - `README.md`: end-user documentation. Keep its marketplace-style format; put
 	developer workflow notes in this file instead.
 

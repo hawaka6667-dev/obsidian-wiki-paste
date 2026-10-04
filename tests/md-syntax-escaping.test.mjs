@@ -12,6 +12,7 @@ test("escapes documented plain-text cases", () => {
   );
   assert.equal(escapeMarkdownSyntax("$x^2$"), String.raw`\$x^2$`);
   assert.equal(escapeMarkdownSyntax("text #tag/sub-tag"), String.raw`text \#tag/sub-tag`);
+  assert.equal(escapeMarkdownSyntax("snake_case and _word_"), String.raw`snake_case and \_word_`);
 });
 
 test("escapes footnote definitions in plain-text and rich-paste paths", () => {
