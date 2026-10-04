@@ -1,5 +1,5 @@
 <#
-@machine: Publishes the existing .dist/<version> Obsidian plugin bundle and manifest as GitHub release assets, after validating repository, tag, and GitHub CLI state.
+@machine: Publishes the existing .dist/<version> Obsidian plugin bundle, manifest, and stylesheet as GitHub release assets, after validating repository, tag, and GitHub CLI state.
 #>
 $ErrorActionPreference = "Stop"
 
@@ -20,7 +20,8 @@ if ($packageJson.version -ne $version) {
 $releaseDirectory = Join-Path $PSScriptRoot $version
 $manifestPath = Join-Path $releaseDirectory "manifest.json"
 $bundlePath = Join-Path $releaseDirectory "main.js"
-if (-not (Test-Path -LiteralPath $manifestPath) -or -not (Test-Path -LiteralPath $bundlePath)) {
+$stylesPath = Join-Path $releaseDirectory "styles.css"
+if (-not (Test-Path -LiteralPath $manifestPath) -or -not (Test-Path -LiteralPath $bundlePath) -or -not (Test-Path -LiteralPath $stylesPath)) {
     throw "Existing plugin bundle not found for version '$version': $releaseDirectory"
 }
 
@@ -83,9 +84,9 @@ $releaseExists = $LASTEXITCODE -eq 0
 $ErrorActionPreference = "Stop"
 
 if ($releaseExists) {
-    & gh release upload $tag $bundlePath $manifestPath --clobber
+    & gh release upload $tag $bundlePath $manifestPath $stylesPath --clobber
 } else {
-    & gh release create $tag $bundlePath $manifestPath --title "Wiki Paste $tag" --generate-notes
+    & gh release create $tag $bundlePath $manifestPath $stylesPath --title "Wiki Paste $tag" --generate-notes
 }
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to publish GitHub release $tag."
@@ -102,4 +103,5 @@ Write-Host "Release complete"
 Write-Host "Version: $tag"
 Write-Host "Uploaded plugin bundle: $bundlePath"
 Write-Host "Uploaded plugin manifest: $manifestPath"
+Write-Host "Uploaded plugin stylesheet: $stylesPath"
 Write-Host "Release URL: $releaseUrl"
