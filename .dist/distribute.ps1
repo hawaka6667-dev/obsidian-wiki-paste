@@ -35,10 +35,10 @@ $bundlePath = Join-Path $releasePath 'main.js'
 $vaultRegistryPath = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'obsidian\obsidian.json'
 
 if (-not (Test-Path -LiteralPath $manifestPath)) {
-    throw "Versioned build manifest not found: $manifestPath. Run .dist/build.ps1 first."
+    throw "Versioned build manifest not found: $manifestPath. Run npm run build first."
 }
 if (-not (Test-Path -LiteralPath $bundlePath)) {
-    throw "Build output not found: $bundlePath. Run .dist/build.ps1 first."
+    throw "Build output not found: $bundlePath. Run npm run build first."
 }
 if (-not (Test-Path -LiteralPath $vaultRegistryPath)) {
     throw "Obsidian vault registry not found: $vaultRegistryPath"

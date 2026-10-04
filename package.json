@@ -1,6 +1,6 @@
 {
   "name": "wiki-paste",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "scripts": {
     "build": "node .dist/build.mjs",
     "test": "tsx --test",

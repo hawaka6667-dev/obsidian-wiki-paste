@@ -1,8 +1,9 @@
 // @machine:
+// 这里只维护和优化转换规则，规则要求是提炼出对应ob符号的那种基本逻辑，以后还会提供更多case
 // Scans each plain-text input for active Markdown and Obsidian syntax.
 // Post-conversion rules preserve Markdown links and escape Obsidian conflicts and unmatched brackets.
 // Sends fresh offsets to md-escape-optimization.ts and preserves source line endings.
-// 这里只维护和优化转换规则，规则要求是提炼出对应ob符号的那种基本逻辑，以后还会提供更多case
+
 import { isMarkdownEscapablePunctuation, optimizeMarkdownEscapes } from "./md-escape-optimization";
 
 type EscapeMarker = (index: number) => void;

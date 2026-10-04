@@ -1,7 +1,7 @@
 // @machine:
 // Handles paste events inside the active Obsidian Markdown editor.
-// Snapshots rich pastes and post-processes Obsidian's inserted Markdown on editor-change.
-// Plain text is escaped before insertion; native Markdown formatting and tables are preserved.
+// Tracks in-editor copies so matching Markdown pastes bypass webpage syntax escaping.
+// Snapshots external rich pastes and post-processes Obsidian's conversion on editor-change.
 import type { Editor, MarkdownView } from "obsidian";
 import { escapeMarkdownSyntax, escapeObsidianSyntax } from "./md-syntax-escaping";
 
@@ -12,6 +12,42 @@ interface PendingHtmlPaste {
 }
 
 const pendingHtmlPastes = new WeakMap<Editor, PendingHtmlPaste>();
+const recentInternalMarkdownCopies = new WeakMap<Document, { text: string; copiedAt: number }>();
+const internalCopyLifetimeMs = 10_000;
+
+export function handleEditorCopy(event: ClipboardEvent, view: MarkdownView): boolean {
+  const document = view.containerEl.ownerDocument;
+  recentInternalMarkdownCopies.delete(document);
+
+  const target = event.target as Element | null;
+  if (!target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
+    return false;
+  }
+
+  const clipboardText = event.clipboardData?.getData("text/plain");
+  const copiedText = clipboardText || view.editor.getSelection();
+  if (!copiedText) {
+    return false;
+  }
+
+  recentInternalMarkdownCopies.set(document, { text: copiedText, copiedAt: Date.now() });
+  return true;
+}
+
+export function clearRecentInternalMarkdownCopy(document: Document): void {
+  recentInternalMarkdownCopies.delete(document);
+}
+
+function consumeRecentInternalMarkdownCopy(document: Document, clipboardText: string | undefined): boolean {
+  const recentCopy = recentInternalMarkdownCopies.get(document);
+  if (!recentCopy) {
+    return false;
+  }
+
+  recentInternalMarkdownCopies.delete(document);
+  const age = Date.now() - recentCopy.copiedAt;
+  return clipboardText === recentCopy.text && age >= 0 && age <= internalCopyLifetimeMs;
+}
 
 export function handleEditorPaste(event: ClipboardEvent, view: MarkdownView): boolean {
   const target = event.target as Element | null;
@@ -20,7 +56,13 @@ export function handleEditorPaste(event: ClipboardEvent, view: MarkdownView): bo
     return false;
   }
 
-  const clipboardHtml = event.clipboardData?.getData("text/html");
+  const clipboardData = event.clipboardData;
+  const clipboardText = clipboardData?.getData("text/plain");
+  if (consumeRecentInternalMarkdownCopy(view.containerEl.ownerDocument, clipboardText)) {
+    return false;
+  }
+
+  const clipboardHtml = clipboardData?.getData("text/html");
 
   if (clipboardHtml) {
     const editor = view.editor;
@@ -37,8 +79,6 @@ export function handleEditorPaste(event: ClipboardEvent, view: MarkdownView): bo
     }, 0);
     return false;
   }
-
-  const clipboardText = event.clipboardData?.getData("text/plain");
 
   if (typeof clipboardText !== "string") {
     return false;

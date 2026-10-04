@@ -1,9 +1,14 @@
 // @machine:
-// Loads and migrates settings, then registers a capture-phase paste listener.
+// Loads and migrates settings, tracks Markdown editor copy provenance, and registers paste listeners.
 // Delegates Markdown and Canvas events to their handlers and persists settings changes.
 import { MarkdownView, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
 import { handleCanvasPaste } from "./auto-expand-canvas/canvas-auto-expand";
-import { handleEditorChange, handleEditorPaste } from "./escape-markdown-syntax/md-editor-paste-handler";
+import {
+  clearRecentInternalMarkdownCopy,
+  handleEditorChange,
+  handleEditorCopy,
+  handleEditorPaste,
+} from "./escape-markdown-syntax/md-editor-paste-handler";
 
 interface WikiPasteSettings {
   escapeMarkdownSyntax: boolean;
@@ -28,6 +33,14 @@ export default class WikiPastePlugin extends Plugin {
       autoExpandCanvasCards: savedSettings?.autoExpandCanvasCards ?? DEFAULT_SETTINGS.autoExpandCanvasCards,
     };
     this.addSettingTab(new WikiPasteSettingTab(this.app, this));
+
+    this.registerDomEvent(document, "copy", (event: ClipboardEvent) => {
+      const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      if (markdownView) {
+        handleEditorCopy(event, markdownView);
+      }
+    });
+    this.registerDomEvent(window, "blur", () => clearRecentInternalMarkdownCopy(document));
 
     this.registerDomEvent(document, "paste", (event: ClipboardEvent) => {
       if (this.settings.escapeMarkdownSyntax) {

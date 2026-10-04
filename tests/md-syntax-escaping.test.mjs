@@ -14,6 +14,14 @@ test("escapes documented plain-text cases", () => {
   assert.equal(escapeMarkdownSyntax("text #tag/sub-tag"), String.raw`text \#tag/sub-tag`);
 });
 
+test("escapes footnote definitions in plain-text and rich-paste paths", () => {
+  const input = "[^ref29]: Footnote source.";
+  const expected = String.raw`\[^ref29]: Footnote source.`;
+
+  assert.equal(escapeMarkdownSyntax(input), expected);
+  assert.equal(escapeObsidianSyntax(input), expected);
+});
+
 test("escapes Obsidian syntax in rich-paste table cells without changing table structure", () => {
   const input = [
     "| Pattern | Meaning |",

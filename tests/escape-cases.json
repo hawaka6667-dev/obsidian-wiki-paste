@@ -1,6 +1,7 @@
 {
   "plainText": [
     { "x": "[^abc]", "fx": "\\[^abc]" },
+    { "x": "[^ref29]: Footnote source.", "fx": "\\[^ref29]: Footnote source." },
     { "x": "### Heading ###", "fx": "\\### Heading ###" },
     { "x": "- item", "fx": "\\- item -" },
     { "x": "1. item", "fx": "1\\. item1." },
