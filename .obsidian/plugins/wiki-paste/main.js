@@ -534,46 +534,12 @@ function escapeMarkdownSyntax(text) {
 
 // src/escape-markdown-syntax/md-editor-paste-handler.ts
 var pendingHtmlPastes = /* @__PURE__ */ new WeakMap();
-var recentInternalMarkdownCopies = /* @__PURE__ */ new WeakMap();
-var internalCopyLifetimeMs = 1e4;
-function handleEditorCopy(event, view) {
-  const document2 = view.containerEl.ownerDocument;
-  recentInternalMarkdownCopies.delete(document2);
-  const target = event.target;
-  if (!target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
-    return false;
-  }
-  const clipboardText = event.clipboardData?.getData("text/plain");
-  const copiedText = clipboardText || view.editor.getSelection();
-  if (!copiedText) {
-    return false;
-  }
-  recentInternalMarkdownCopies.set(document2, { text: copiedText, copiedAt: Date.now() });
-  return true;
-}
-function clearRecentInternalMarkdownCopy(document2) {
-  recentInternalMarkdownCopies.delete(document2);
-}
-function consumeRecentInternalMarkdownCopy(document2, clipboardText) {
-  const recentCopy = recentInternalMarkdownCopies.get(document2);
-  if (!recentCopy) {
-    return false;
-  }
-  recentInternalMarkdownCopies.delete(document2);
-  const age = Date.now() - recentCopy.copiedAt;
-  return clipboardText === recentCopy.text && age >= 0 && age <= internalCopyLifetimeMs;
-}
 function handleEditorPaste(event, view) {
   const target = event.target;
   if (!target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
     return false;
   }
-  const clipboardData = event.clipboardData;
-  const clipboardText = clipboardData?.getData("text/plain");
-  if (consumeRecentInternalMarkdownCopy(view.containerEl.ownerDocument, clipboardText)) {
-    return false;
-  }
-  const clipboardHtml = clipboardData?.getData("text/html");
+  const clipboardHtml = event.clipboardData?.getData("text/html");
   if (clipboardHtml) {
     const editor = view.editor;
     const pendingPaste = {
@@ -589,6 +555,7 @@ function handleEditorPaste(event, view) {
     }, 0);
     return false;
   }
+  const clipboardText = event.clipboardData?.getData("text/plain");
   if (typeof clipboardText !== "string") {
     return false;
   }
@@ -635,13 +602,6 @@ var WikiPastePlugin = class extends import_obsidian.Plugin {
       autoExpandCanvasCards: savedSettings?.autoExpandCanvasCards ?? DEFAULT_SETTINGS.autoExpandCanvasCards
     };
     this.addSettingTab(new WikiPasteSettingTab(this.app, this));
-    this.registerDomEvent(document, "copy", (event) => {
-      const markdownView = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
-      if (markdownView) {
-        handleEditorCopy(event, markdownView);
-      }
-    });
-    this.registerDomEvent(window, "blur", () => clearRecentInternalMarkdownCopy(document));
     this.registerDomEvent(document, "paste", (event) => {
       if (this.settings.escapeMarkdownSyntax) {
         const markdownView = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);

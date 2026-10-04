@@ -2,11 +2,11 @@
 // Loads and migrates settings, tracks Markdown editor copy provenance, and registers paste listeners.
 // Delegates Markdown and Canvas events to their handlers and persists settings changes.
 import { MarkdownView, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
-import { handleCanvasPaste } from "./auto-expand-canvas/canvas-auto-expand";
+import { handleCanvasMarkdownPaste, handleCanvasPaste } from "./auto-expand-canvas/canvas-auto-expand";
 import {
   clearRecentInternalMarkdownCopy,
   handleEditorChange,
-  handleEditorCopy,
+  handleObsidianCopy,
   handleEditorPaste,
 } from "./escape-markdown-syntax/md-editor-paste-handler";
 
@@ -36,22 +36,23 @@ export default class WikiPastePlugin extends Plugin {
 
     this.registerDomEvent(document, "copy", (event: ClipboardEvent) => {
       const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-      if (markdownView) {
-        handleEditorCopy(event, markdownView);
-      }
+      handleObsidianCopy(event, document, markdownView ?? undefined);
     });
     this.registerDomEvent(window, "blur", () => clearRecentInternalMarkdownCopy(document));
 
     this.registerDomEvent(document, "paste", (event: ClipboardEvent) => {
+      const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      const activeView = this.app.workspace.activeLeaf?.view;
+
       if (this.settings.escapeMarkdownSyntax) {
-        const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (markdownView) {
           handleEditorPaste(event, markdownView);
+        } else if (activeView) {
+          handleCanvasMarkdownPaste(event, activeView);
         }
       }
 
       if (this.settings.autoExpandCanvasCards) {
-        const activeView = this.app.workspace.activeLeaf?.view;
         if (activeView) {
           handleCanvasPaste(event, activeView);
         }

@@ -1,7 +1,9 @@
-# @machine: Resolves selected registered vaults, rejects path mismatches or disabled plugins, runs Obsidian CLI plugin:reload, and verifies its Reloaded confirmation.
+# @machine: Resolves selected registered vaults, verifies the installed plugin version and enabled state, runs Obsidian CLI plugin:reload, and verifies its Reloaded confirmation.
 param(
-    [ValidateSet('Test', 'Main', 'Both')]
-    [string]$Target = 'Test',
+    [ValidateSet('Candidate', 'Baseline', 'GameDevVault', 'wiki paste', 'Both')]
+    [string]$Target = 'Candidate',
+
+    [string]$Version,
 
     [string]$ObsidianCliPath
 )
@@ -21,20 +23,18 @@ else {
 }
 $sourceManifestPath = Join-Path $testVaultPath 'manifest.json'
 $sourceManifest = Get-Content -LiteralPath $sourceManifestPath -Raw | ConvertFrom-Json
-$manifestPath = Join-Path (Join-Path $testVaultPath '.dist') "$($sourceManifest.version)\manifest.json"
+$pluginId = [string]$sourceManifest.id
 $vaultRegistryPath = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'obsidian\obsidian.json'
 
-if (-not (Test-Path -LiteralPath $manifestPath)) {
-    throw "Plugin manifest not found: $manifestPath"
+if (-not $pluginId) {
+    throw "Plugin ID is missing from $sourceManifestPath"
+}
+if ($Version -and $Version -notmatch '^\d+(?:\.\d+)+$') {
+    throw "Invalid numeric version: '$Version'"
 }
 
 if (-not (Test-Path -LiteralPath $vaultRegistryPath)) {
     throw "Obsidian vault registry not found: $vaultRegistryPath"
-}
-
-$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if (-not $manifest.id) {
-    throw "Plugin ID is missing from $manifestPath"
 }
 
 $registry = Get-Content -LiteralPath $vaultRegistryPath -Raw | ConvertFrom-Json
@@ -70,13 +70,17 @@ else {
 }
 
 $targets = switch ($Target) {
-    'Test' { @($testVaultPath) }
-    'Main' { @($mainVaultPath) }
-    'Both' { @($testVaultPath, $mainVaultPath) }
+    { $_ -in @('Candidate', 'GameDevVault') } { [PSCustomObject]@{ Name = 'GameDevVault'; Path = $mainVaultPath } }
+    { $_ -in @('Baseline', 'wiki paste') } { [PSCustomObject]@{ Name = 'wiki paste'; Path = $testVaultPath } }
+    'Both' {
+        [PSCustomObject]@{ Name = 'wiki paste'; Path = $testVaultPath }
+        [PSCustomObject]@{ Name = 'GameDevVault'; Path = $mainVaultPath }
+    }
 }
 
 $failures = @()
-foreach ($vaultRoot in $targets) {
+foreach ($targetVault in $targets) {
+	$vaultRoot = $targetVault.Path
     $matchingVaults = @(
         foreach ($vault in $registry.vaults.PSObject.Properties) {
             $registeredPath = [System.IO.Path]::GetFullPath([string]$vault.Value.path).TrimEnd([char[]]@('\', '/'))
@@ -114,6 +118,27 @@ foreach ($vaultRoot in $targets) {
         continue
     }
 
+    $installedManifestPath = Join-Path $vaultRoot ".obsidian\plugins\$pluginId\manifest.json"
+    if (-not (Test-Path -LiteralPath $installedManifestPath)) {
+        $failures += "Installed plugin manifest not found: $installedManifestPath."
+        continue
+    }
+    try {
+        $installedManifest = Get-Content -LiteralPath $installedManifestPath -Raw | ConvertFrom-Json
+    }
+    catch {
+        $failures += "Could not parse installed plugin manifest '$installedManifestPath': $($_.Exception.Message)"
+        continue
+    }
+    if ($installedManifest.id -ne $pluginId) {
+        $failures += "Installed manifest at '$installedManifestPath' has unexpected plugin ID '$($installedManifest.id)'."
+        continue
+    }
+    if ($Version -and $installedManifest.version -ne $Version) {
+        $failures += "Installed version '$($installedManifest.version)' in '$vaultRoot' does not match requested version '$Version'."
+        continue
+    }
+
     $enabledOutput = & $cli "vault=$vaultId" plugins:enabled filter=community format=json
     $enabledExitCode = $LASTEXITCODE
     if ($enabledExitCode -ne 0) {
@@ -130,21 +155,21 @@ foreach ($vaultRoot in $targets) {
     }
 
     $enabledIds = @($enabledPlugins | ForEach-Object { [string]$_.id })
-    if ($enabledIds -notcontains [string]$manifest.id) {
-        $failures += "Plugin '$($manifest.id)' is not loaded as enabled in '$vaultRoot'. For a first install, run .dist/distribute.ps1 and restart Obsidian once so it scans the new plugin folder."
+    if ($enabledIds -notcontains $pluginId) {
+        $failures += "Plugin '$pluginId' is not loaded as enabled in '$vaultRoot'. For a first install, run .dist/distribute.ps1 and restart Obsidian once so it scans the new plugin folder."
         continue
     }
 
-    Write-Host "Reloading '$($manifest.id)' in '$vaultRoot'..."
-    $reloadOutput = & $cli "vault=$vaultId" plugin:reload "id=$($manifest.id)"
+    Write-Host "Reloading '$pluginId' version '$($installedManifest.version)' in '$vaultRoot'..."
+    $reloadOutput = & $cli "vault=$vaultId" plugin:reload "id=$pluginId"
     $reloadExitCode = $LASTEXITCODE
     $reloadText = $reloadOutput -join [Environment]::NewLine
     if ($reloadText) {
         Write-Output $reloadText
     }
 
-    if ($reloadExitCode -ne 0 -or $reloadText -notmatch "(?m)^Reloaded:\s*$([regex]::Escape([string]$manifest.id))\s*$") {
-        $failures += "Obsidian CLI did not confirm plugin '$($manifest.id)' was reloaded in '$vaultRoot' (exit code $reloadExitCode)."
+    if ($reloadExitCode -ne 0 -or $reloadText -notmatch "(?m)^Reloaded:\s*$([regex]::Escape($pluginId))\s*$") {
+        $failures += "Obsidian CLI did not confirm plugin '$pluginId' was reloaded in '$vaultRoot' (exit code $reloadExitCode)."
     }
 }
 

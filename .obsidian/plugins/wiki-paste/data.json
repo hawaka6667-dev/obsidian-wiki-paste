@@ -1,4 +1,4 @@
 {
-  "escapeMarkdownSyntax": false,
+  "escapeMarkdownSyntax": true,
   "autoExpandCanvasCards": true
 }

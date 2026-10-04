@@ -3,6 +3,8 @@
   "version": "0.1.27",
   "scripts": {
     "build": "node .dist/build.mjs",
+    "sync": "pwsh -File .dist/sync.ps1",
+    "release": "pwsh -File .dist/release.ps1",
     "test": "tsx --test",
     "typecheck": "tsc --noEmit"
   },

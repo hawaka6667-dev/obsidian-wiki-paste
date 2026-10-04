@@ -12,25 +12,24 @@ interface PendingHtmlPaste {
 }
 
 const pendingHtmlPastes = new WeakMap<Editor, PendingHtmlPaste>();
-const recentInternalMarkdownCopies = new WeakMap<Document, { text: string; copiedAt: number }>();
-const internalCopyLifetimeMs = 10_000;
+const recentInternalMarkdownCopies = new WeakMap<Document, { text: string }>();
 
 export function handleEditorCopy(event: ClipboardEvent, view: MarkdownView): boolean {
-  const document = view.containerEl.ownerDocument;
+  return handleObsidianCopy(event, view.containerEl.ownerDocument, view);
+}
+
+export function handleObsidianCopy(event: ClipboardEvent, document: Document, view?: MarkdownView): boolean {
   recentInternalMarkdownCopies.delete(document);
-
   const target = event.target as Element | null;
-  if (!target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
-    return false;
-  }
-
-  const clipboardText = event.clipboardData?.getData("text/plain");
-  const copiedText = clipboardText || view.editor.getSelection();
+  const clipboardText = event.clipboardData?.getData("text/plain") ?? "";
+  const copiedText = clipboardText || (view && target?.closest?.(".cm-content") && view.containerEl.contains(target)
+    ? view.editor.getSelection()
+    : "");
   if (!copiedText) {
     return false;
   }
 
-  recentInternalMarkdownCopies.set(document, { text: copiedText, copiedAt: Date.now() });
+  recentInternalMarkdownCopies.set(document, { text: copiedText });
   return true;
 }
 
@@ -38,15 +37,14 @@ export function clearRecentInternalMarkdownCopy(document: Document): void {
   recentInternalMarkdownCopies.delete(document);
 }
 
-function consumeRecentInternalMarkdownCopy(document: Document, clipboardText: string | undefined): boolean {
+export function consumeRecentInternalMarkdownCopy(document: Document, clipboardText: string | undefined): boolean {
   const recentCopy = recentInternalMarkdownCopies.get(document);
   if (!recentCopy) {
     return false;
   }
 
   recentInternalMarkdownCopies.delete(document);
-  const age = Date.now() - recentCopy.copiedAt;
-  return clipboardText === recentCopy.text && age >= 0 && age <= internalCopyLifetimeMs;
+  return clipboardText === recentCopy.text;
 }
 
 export function handleEditorPaste(event: ClipboardEvent, view: MarkdownView): boolean {
