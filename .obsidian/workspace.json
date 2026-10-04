@@ -11,38 +11,17 @@
             "id": "8d7b1f4f998a417b",
             "type": "leaf",
             "state": {
-              "type": "canvas",
+              "type": "markdown",
               "state": {
-                "file": "Untitled.canvas",
-                "viewState": {
-                  "x": 217.60003662109375,
-                  "y": 120.80001831054688,
-                  "zoom": -0.6666666666666666
-                }
+                "file": "README.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-layout-dashboard",
-              "title": "Untitled"
-            }
-          },
-          {
-            "id": "3cf5cc1c2f4ef81c",
-            "type": "leaf",
-            "state": {
-              "type": "canvas",
-              "state": {
-                "file": "wiki-paste-auto-expand-visual-20261004144505.canvas",
-                "viewState": {
-                  "x": -87.199951171875,
-                  "y": 20,
-                  "zoom": 0
-                }
-              },
-              "icon": "lucide-layout-dashboard",
-              "title": "wiki-paste-auto-expand-visual-20261004144505"
+              "icon": "lucide-file",
+              "title": "README"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "vertical"
@@ -209,33 +188,35 @@
       "bases:Create new base": false
     }
   },
-  "active": "3cf5cc1c2f4ef81c",
+  "active": "e420b9295bd68d2a",
   "lastOpenFiles": [
-    "canvas-auto-expand-current.png",
-    "src/auto-expand-canvas/canvas-auto-expand.ts",
-    "src/escape-markdown-syntax/md-escape-optimization.ts",
-    "src/escape-markdown-syntax/md-syntax-escaping.ts",
-    "src/escape-markdown-syntax/md-editor-paste-handler.ts",
-    "src/auto-expand-canvas",
-    "src/escape-markdown-syntax",
-    "wiki-paste-ab-test log.md",
-    "wiki-paste-auto-expand-visual-20261004144505.canvas",
-    "wiki-paste-auto-expand-ab-20261004.canvas",
-    "wiki-paste-auto-expand-ab-final.canvas",
+    "helper.md",
+    "design doc.md",
+    "md-syntax-escaping.md",
+    "local-testing/scratch-text-canvas.canvas",
+    "table.md",
+    "test.md",
+    "local-testing/Untitled.canvas",
+    "local-testing/wiki-paste-ab-test log.md",
+    "local-testing/wiki-paste-auto-expand-ab-final.canvas",
+    "local-testing/wiki-paste-auto-expand-visual-20261004144505.canvas",
+    "local-testing/wiki-paste-auto-expand-ab-20261004.canvas",
+    "local-testing/markdown-copy-scope/ab-test.md",
+    "local-testing/markdown-copy-scope",
+    "local-testing/wiki-paste-ab-case-20261004.md",
+    "local-testing/canvas-auto-expand-rollback-test.canvas",
+    "local-testing",
+    "tests/md-editor-paste-handler.test.mjs",
+    "tests/md-syntax-escaping.test.mjs",
     "tests/canvas-auto-expand.test.mjs",
-    "src/canvas-auto-expand.ts",
-    "Untitled.canvas",
+    "src/escape-markdown-syntax/md-syntax-escaping.ts",
+    "src/escape-markdown-syntax/md-escape-optimization.ts",
+    "src/escape-markdown-syntax/md-editor-paste-handler.ts",
+    "canvas-auto-expand-current.png",
     "_wiki-paste-pipe-smoke-d732a4ab65cf4f45bb83fd1c11b9e4e7.md",
     "_wiki-paste-pipe-smoke-700f57a2ecd942ce9e2bd6151fefcd1f.md",
     "_wiki-paste-table-smoke-feebeb34502949799a91fbc01bdf91a4.md",
-    "tests/md-syntax-escaping.test.mjs",
-    "md-syntax-escaping.md",
-    "tests/md-syntax-escaping.test.ts",
-    "test.md",
-    "table.md",
     "abc.md",
-    "design doc.md",
-    "scratch-text-canvas.canvas",
     "empty-note-placeholder.md",
     "markdown-paste-regression-cases.md",
     "paste-conversion-examples.md",
@@ -247,10 +228,6 @@
     "node_modules/undici/docs/docs/best-practices/migrating-from-v7-to-v8.md",
     "node_modules/undici/docs/docs/best-practices/crawling.md",
     "node_modules/undici/docs/docs/best-practices/client-certificate.md",
-    "node_modules/undici/docs/docs/api/WebSocket.md",
-    "node_modules/undici/docs/docs/api/Util.md",
-    "node_modules/undici/docs/docs/api/Socks5ProxyAgent.md",
-    "node_modules/undici/docs/docs/api/SnapshotAgent.md",
-    "node_modules/undici/docs/docs/api/RoundRobinPool.md"
+    "node_modules/undici/docs/docs/api/WebSocket.md"
   ]
 }

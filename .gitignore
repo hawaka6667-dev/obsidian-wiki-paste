@@ -1,3 +1,4 @@
 /local-testing/
 /.dist/*/
 /.codegraph/
+/.obsidian/plugins/mcp-tools-istefox/main.js
