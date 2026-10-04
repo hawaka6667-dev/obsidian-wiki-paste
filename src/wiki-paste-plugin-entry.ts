@@ -1,18 +1,20 @@
 // @machine:
 // Loads and migrates settings, then registers a capture-phase paste listener.
-// Delegates active MarkdownView events to md-editor-paste-handler.ts and persists changes.
+// Delegates Markdown and Canvas events to their handlers and persists settings changes.
 import { MarkdownView, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
-import { handleEditorChange, handleEditorPaste } from "./md-editor-paste-handler";
+import { handleCanvasPaste } from "./auto-expand-canvas/canvas-auto-expand";
+import { handleEditorChange, handleEditorPaste } from "./escape-markdown-syntax/md-editor-paste-handler";
 
 interface WikiPasteSettings {
   escapeMarkdownSyntax: boolean;
+  autoExpandCanvasCards: boolean;
 }
 
 interface StoredWikiPasteSettings extends Partial<WikiPasteSettings> {
   escapeFootnoteReferences?: boolean;
 }
 
-const DEFAULT_SETTINGS: WikiPasteSettings = { escapeMarkdownSyntax: true };
+const DEFAULT_SETTINGS: WikiPasteSettings = { escapeMarkdownSyntax: true, autoExpandCanvasCards: true };
 
 export default class WikiPastePlugin extends Plugin {
   settings!: WikiPasteSettings;
@@ -23,18 +25,23 @@ export default class WikiPastePlugin extends Plugin {
       escapeMarkdownSyntax: savedSettings?.escapeMarkdownSyntax
         ?? savedSettings?.escapeFootnoteReferences
         ?? DEFAULT_SETTINGS.escapeMarkdownSyntax,
+      autoExpandCanvasCards: savedSettings?.autoExpandCanvasCards ?? DEFAULT_SETTINGS.autoExpandCanvasCards,
     };
     this.addSettingTab(new WikiPasteSettingTab(this.app, this));
 
     this.registerDomEvent(document, "paste", (event: ClipboardEvent) => {
-      if (!this.settings.escapeMarkdownSyntax) {
-        return;
+      if (this.settings.escapeMarkdownSyntax) {
+        const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (markdownView) {
+          handleEditorPaste(event, markdownView);
+        }
       }
 
-      const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-
-      if (view) {
-        handleEditorPaste(event, view);
+      if (this.settings.autoExpandCanvasCards) {
+        const activeView = this.app.workspace.activeLeaf?.view;
+        if (activeView) {
+          handleCanvasPaste(event, activeView);
+        }
       }
     }, { capture: true });
 
@@ -47,6 +54,11 @@ export default class WikiPastePlugin extends Plugin {
 
   async setMarkdownEscapingEnabled(enabled: boolean): Promise<void> {
     this.settings.escapeMarkdownSyntax = enabled;
+    await this.saveData(this.settings);
+  }
+
+  async setCanvasAutoExpandEnabled(enabled: boolean): Promise<void> {
+    this.settings.autoExpandCanvasCards = enabled;
     await this.saveData(this.settings);
   }
 }
@@ -69,5 +81,12 @@ class WikiPasteSettingTab extends PluginSettingTab {
       .addToggle((toggle) => toggle
         .setValue(this.plugin.settings.escapeMarkdownSyntax)
         .onChange((enabled) => this.plugin.setMarkdownEscapingEnabled(enabled)));
+
+    new Setting(containerEl)
+      .setName("Auto-expand pasted Canvas cards")
+      .setDesc("Resize text cards after pasting so their content is visible.")
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.autoExpandCanvasCards)
+        .onChange((enabled) => this.plugin.setCanvasAutoExpandEnabled(enabled)));
   }
 }

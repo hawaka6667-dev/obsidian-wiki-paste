@@ -1,4 +1,7 @@
 
+deprecated已挪到ab test
+
+
 
 对比原始粘贴文本与 Wiki Paste 扩展处理后的内容，x是原文，fx 表示一种能避开 Obsidian 解析冲突的写法，不是唯一标准答案
 

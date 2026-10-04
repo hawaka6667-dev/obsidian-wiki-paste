@@ -1,7 +1,7 @@
 # @machine: Resolves Test/Main/Both vaults, verifies build and Obsidian CLI identity, copies manifest and bundle, checks SHA-256, and reloads only enabled plugin copies.
 param(
     [ValidateSet('Test', 'Main', 'Both')]
-    [string]$Target = 'Main',
+    [string]$Target = 'Both',
 
     [string]$ObsidianCliPath
 )

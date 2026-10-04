@@ -11,17 +11,38 @@
             "id": "8d7b1f4f998a417b",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "canvas",
               "state": {
-                "file": "test.md",
-                "mode": "source",
-                "source": false
+                "file": "Untitled.canvas",
+                "viewState": {
+                  "x": 217.60003662109375,
+                  "y": 120.80001831054688,
+                  "zoom": -0.6666666666666666
+                }
               },
-              "icon": "lucide-file",
-              "title": "test"
+              "icon": "lucide-layout-dashboard",
+              "title": "Untitled"
+            }
+          },
+          {
+            "id": "3cf5cc1c2f4ef81c",
+            "type": "leaf",
+            "state": {
+              "type": "canvas",
+              "state": {
+                "file": "wiki-paste-auto-expand-visual-20261004144505.canvas",
+                "viewState": {
+                  "x": -87.199951171875,
+                  "y": 20,
+                  "zoom": 0
+                }
+              },
+              "icon": "lucide-layout-dashboard",
+              "title": "wiki-paste-auto-expand-visual-20261004144505"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -188,21 +209,30 @@
       "bases:Create new base": false
     }
   },
-  "active": "8d7b1f4f998a417b",
+  "active": "3cf5cc1c2f4ef81c",
   "lastOpenFiles": [
-    "tests/rich-html-clipboard-to-md.test.js",
-    "tests/cases/rich-html-clipboard-to-md.js",
-    "tests/cases/md-syntax-escaping.js",
-    "tests/cases",
-    "tests/md-syntax-escaping.test.js",
-    "table.md",
-    "tests/escape-case-provider.js",
-    "tests/escape-cases.json",
-    "tests/table-fixtures.js",
-    "tests/native-paste-postprocessing.test.js",
-    "src/rich-html-clipboard-to-md-converter.ts",
-    "src/md-syntax-escaping.ts",
+    "canvas-auto-expand-current.png",
+    "src/auto-expand-canvas/canvas-auto-expand.ts",
+    "src/escape-markdown-syntax/md-escape-optimization.ts",
+    "src/escape-markdown-syntax/md-syntax-escaping.ts",
+    "src/escape-markdown-syntax/md-editor-paste-handler.ts",
+    "src/auto-expand-canvas",
+    "src/escape-markdown-syntax",
+    "wiki-paste-ab-test log.md",
+    "wiki-paste-auto-expand-visual-20261004144505.canvas",
+    "wiki-paste-auto-expand-ab-20261004.canvas",
+    "wiki-paste-auto-expand-ab-final.canvas",
+    "tests/canvas-auto-expand.test.mjs",
+    "src/canvas-auto-expand.ts",
+    "Untitled.canvas",
+    "_wiki-paste-pipe-smoke-d732a4ab65cf4f45bb83fd1c11b9e4e7.md",
+    "_wiki-paste-pipe-smoke-700f57a2ecd942ce9e2bd6151fefcd1f.md",
+    "_wiki-paste-table-smoke-feebeb34502949799a91fbc01bdf91a4.md",
+    "tests/md-syntax-escaping.test.mjs",
+    "md-syntax-escaping.md",
+    "tests/md-syntax-escaping.test.ts",
     "test.md",
+    "table.md",
     "abc.md",
     "design doc.md",
     "scratch-text-canvas.canvas",
@@ -210,7 +240,6 @@
     "markdown-paste-regression-cases.md",
     "paste-conversion-examples.md",
     "development-design-notes.md",
-    "Untitled.canvas",
     "node_modules/undici/docs/docs/best-practices/writing-tests.md",
     "node_modules/undici/docs/docs/best-practices/undici-vs-builtin-fetch.md",
     "node_modules/undici/docs/docs/best-practices/proxy.md",
@@ -222,11 +251,6 @@
     "node_modules/undici/docs/docs/api/Util.md",
     "node_modules/undici/docs/docs/api/Socks5ProxyAgent.md",
     "node_modules/undici/docs/docs/api/SnapshotAgent.md",
-    "node_modules/undici/docs/docs/api/RoundRobinPool.md",
-    "node_modules/undici/docs/docs/api/RetryHandler.md",
-    "node_modules/undici/docs/docs/api/RetryAgent.md",
-    "node_modules/undici/docs/docs/api/RedirectHandler.md",
-    "node_modules/undici/docs/docs/api/ProxyAgent.md",
-    "node_modules/undici/docs/docs/api/PoolStats.md"
+    "node_modules/undici/docs/docs/api/RoundRobinPool.md"
   ]
 }

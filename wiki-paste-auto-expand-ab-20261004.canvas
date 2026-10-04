@@ -1,0 +1,6 @@
+{
+	"nodes":[
+		{"id":"cc1651ff410d2f39","x":-125,"y":-30,"width":250,"height":60,"type":"text","text":"Wiki Paste Canvas Auto Expand A/B\n\nStatus deferred awaits review.\n\n| Column | Description |\n| --- | --- |\n| AX-72 | This long table row should stay visible after paste. |\n\n```text\nalpha beta gamma delta epsilon zeta eta theta\nline two remains visible\n```"}
+	],
+	"edges":[]
+}

@@ -25,7 +25,109 @@ __export(wiki_paste_plugin_entry_exports, {
 module.exports = __toCommonJS(wiki_paste_plugin_entry_exports);
 var import_obsidian = require("obsidian");
 
-// src/md-escape-optimization.ts
+// src/auto-expand-canvas/canvas-auto-expand.ts
+var CARD_WIDTH_GUTTER = 32;
+var CARD_HEIGHT_GUTTER = 2;
+var EDITOR_LAYOUT_SETTLE_MS = 50;
+function getExpandedCanvasSize(width, height, contentWidth, contentHeight) {
+  return {
+    width: Math.max(width, Math.ceil(contentWidth + CARD_WIDTH_GUTTER)),
+    height: Math.max(height, Math.ceil(contentHeight + CARD_HEIGHT_GUTTER))
+  };
+}
+function handleCanvasPaste(event, view) {
+  if (!isCanvasView(view)) {
+    return false;
+  }
+  const clipboard = event.clipboardData;
+  if (!clipboard?.getData("text/plain") && !clipboard?.getData("text/html")) {
+    return false;
+  }
+  const beforePaste = /* @__PURE__ */ new Map();
+  for (const node of view.canvas.nodes.values()) {
+    const data = node.getData();
+    if (data.type === "text") {
+      beforePaste.set(data.id, data.text);
+    }
+  }
+  window.requestAnimationFrame(() => {
+    for (const node of view.canvas.nodes.values()) {
+      const data = node.getData();
+      if (data.type !== "text" || beforePaste.get(data.id) === data.text) {
+        continue;
+      }
+      expandCanvasNode(node);
+    }
+  });
+  return true;
+}
+function isCanvasView(view) {
+  if (!view || typeof view !== "object") {
+    return false;
+  }
+  const candidate = view;
+  return candidate.getViewType?.() === "canvas" && candidate.canvas?.nodes instanceof Map;
+}
+function expandCanvasNode(node) {
+  const data = node.getData();
+  const contentWidth = measureNaturalContentWidth(node.nodeEl);
+  const expandedWidth = getExpandedCanvasSize(data.width, data.height, contentWidth, 0).width;
+  let dimensionsChanged = false;
+  if (expandedWidth > data.width) {
+    node.setData({ width: expandedWidth });
+    dimensionsChanged = true;
+  }
+  window.setTimeout(() => window.requestAnimationFrame(() => {
+    const contentHeight = measureCanvasContentHeight(node.nodeEl);
+    if (contentHeight > 0) {
+      const current = node.getData();
+      const expandedHeight = Math.max(current.height, Math.ceil(contentHeight + CARD_HEIGHT_GUTTER));
+      if (expandedHeight > current.height) {
+        node.setData({ height: expandedHeight });
+        dimensionsChanged = true;
+      }
+    }
+    if (dimensionsChanged) {
+      node.canvas.requestSave();
+    }
+  }), EDITOR_LAYOUT_SETTLE_MS);
+}
+function measureCanvasContentHeight(nodeElement) {
+  const editorFrame = nodeElement.querySelector("iframe.embed-iframe");
+  const editorContent = editorFrame?.contentDocument?.querySelector(".cm-scroller");
+  if (editorContent?.scrollHeight) {
+    return editorContent.scrollHeight;
+  }
+  return nodeElement.querySelector(".canvas-node-container")?.scrollHeight ?? 0;
+}
+function measureNaturalContentWidth(nodeElement) {
+  const clone = nodeElement.cloneNode(true);
+  clone.style.position = "fixed";
+  clone.style.left = "-100000px";
+  clone.style.top = "0";
+  clone.style.transform = "none";
+  clone.style.width = "max-content";
+  clone.style.height = "max-content";
+  clone.style.setProperty("--canvas-node-width", "max-content");
+  clone.style.setProperty("--canvas-node-height", "max-content");
+  for (const element of Array.from(clone.querySelectorAll(
+    ".canvas-node-container, .canvas-node-content, .markdown-preview-view, .markdown-preview-sizer"
+  ))) {
+    element.style.setProperty("width", "max-content", "important");
+    element.style.setProperty("height", "max-content", "important");
+    element.style.setProperty("max-width", "none", "important");
+    element.style.setProperty("max-height", "none", "important");
+    element.style.setProperty("overflow", "visible", "important");
+  }
+  document.body.append(clone);
+  try {
+    return clone.querySelector(".canvas-node-container")?.scrollWidth ?? 0;
+  } finally {
+    clone.remove();
+  }
+}
+
+// src/escape-markdown-syntax/md-escape-optimization.ts
 function optimizeMarkdownEscapes(line, escapeCandidates, indentationLength, preserveExistingEscapes = false, doubleBackslashCandidates = /* @__PURE__ */ new Set()) {
   if (indentationLength > 0) {
     const indentation = line.slice(0, indentationLength);
@@ -76,7 +178,7 @@ function optimizeLineContent(line, escapeCandidates, preserveExistingEscapes, do
   return output;
 }
 
-// src/md-syntax-escaping.ts
+// src/escape-markdown-syntax/md-syntax-escaping.ts
 function markRun(mark, start, length) {
   for (let offset = 0; offset < length; offset += 1) {
     mark(start + offset);
@@ -102,7 +204,7 @@ function collectEmphasisSyntax(line, marker, mark) {
     markRun(mark, match.index, match[1].length);
   }
 }
-function collectPairedMarkerSyntax(line, marker, mark, escapeOpeningLength) {
+function collectPairedMarkerSyntax(line, marker, mark, escapeOpeningLength, escapeClosingRun = false) {
   const runs = collectRuns(line, marker);
   for (let index = 0; index < runs.length; index += 1) {
     const opening = runs[index];
@@ -115,7 +217,11 @@ function collectPairedMarkerSyntax(line, marker, mark, escapeOpeningLength) {
     if (closingIndex === -1) {
       continue;
     }
+    const closing = runs[closingIndex];
     markRun(mark, opening.start, escapeOpeningLength(opening.length));
+    if (escapeClosingRun) {
+      markRun(mark, closing.start, escapeOpeningLength(closing.length));
+    }
     index = closingIndex;
   }
 }
@@ -257,7 +363,7 @@ function collectUnmatchedOpeningBrackets(line, codeRanges, markdownLinks, mark) 
   }
   openings.forEach(mark);
 }
-function collectLinkLabelSyntax(line, labels, codeRanges, mark) {
+function collectLinkLabelSyntax(line, labels, codeRanges, mark, isTableCell = false) {
   const doubleBackslashCandidates = /* @__PURE__ */ new Set();
   for (const label of labels) {
     for (let index = label.start; index < label.end; index += 1) {
@@ -272,7 +378,7 @@ function collectLinkLabelSyntax(line, labels, codeRanges, mark) {
         runEnd += 1;
       }
       const punctuation = line[runEnd];
-      if (runEnd - index === 1 && punctuation !== void 0 && punctuation !== "[" && punctuation !== "]" && isMarkdownEscapablePunctuation(punctuation)) {
+      if (runEnd - index === 1 && punctuation !== void 0 && punctuation !== "[" && punctuation !== "]" && !(isTableCell && punctuation === "|") && isMarkdownEscapablePunctuation(punctuation)) {
         doubleBackslashCandidates.add(index);
       }
       index = runEnd - 1;
@@ -327,6 +433,40 @@ function isEscapedByBackslash(line, index) {
   }
   return precedingSlashes % 2 === 1;
 }
+function escapeObsidianLine(content, isTableCell = false) {
+  const syntaxContent = isTableCell ? { content, indentationLength: 0 } : getSyntaxContent(content);
+  if (syntaxContent.indentationLength > 0) {
+    return content;
+  }
+  const escapeCandidates = /* @__PURE__ */ new Set();
+  const codeRanges = collectInlineCodeRanges(syntaxContent.content);
+  const { labels: linkLabels, links: markdownLinks } = collectMarkdownLinks(syntaxContent.content, codeRanges);
+  const mark = (offset) => {
+    const insideInlineCode = isInsideRange(offset, codeRanges);
+    if (!insideInlineCode && !isEscapedByBackslash(syntaxContent.content, offset)) {
+      escapeCandidates.add(offset);
+    }
+  };
+  const doubleBackslashCandidates = collectLinkLabelSyntax(syntaxContent.content, linkLabels, codeRanges, mark, isTableCell);
+  collectUnmatchedOpeningBrackets(syntaxContent.content, codeRanges, markdownLinks, mark);
+  collectObsidianSyntax(syntaxContent.content, mark, linkLabels);
+  return optimizeMarkdownEscapes(content, escapeCandidates, syntaxContent.indentationLength, true, doubleBackslashCandidates);
+}
+function escapeMarkdownTableLine(line) {
+  if (isMarkdownTableSeparator(line)) {
+    return line;
+  }
+  let output = "";
+  let cellStart = 0;
+  for (let index = 0; index < line.length; index += 1) {
+    if (line[index] !== "|" || isEscapedByBackslash(line, index)) {
+      continue;
+    }
+    output += `${escapeObsidianLine(line.slice(cellStart, index), true)}|`;
+    cellStart = index + 1;
+  }
+  return output + escapeObsidianLine(line.slice(cellStart), true);
+}
 function escapeObsidianSyntax(text) {
   const lines = text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
   const contentLines = lines.map((line) => line.replace(/\r?\n$/, ""));
@@ -347,23 +487,13 @@ function escapeObsidianSyntax(text) {
       activeFence = { marker: openingFence[1][0], length: openingFence[1].length };
       return line;
     }
-    if (markdownTableLines.has(index) || getSyntaxContent(content).indentationLength > 0) {
+    if (markdownTableLines.has(index)) {
+      return `${escapeMarkdownTableLine(content)}${lineEnding}`;
+    }
+    if (getSyntaxContent(content).indentationLength > 0) {
       return line;
     }
-    const syntaxContent = getSyntaxContent(content);
-    const escapeCandidates = /* @__PURE__ */ new Set();
-    const codeRanges = collectInlineCodeRanges(syntaxContent.content);
-    const { labels: linkLabels, links: markdownLinks } = collectMarkdownLinks(syntaxContent.content, codeRanges);
-    const mark = (offset) => {
-      const insideInlineCode = isInsideRange(offset, codeRanges);
-      if (!insideInlineCode && !isEscapedByBackslash(syntaxContent.content, offset)) {
-        escapeCandidates.add(offset);
-      }
-    };
-    const doubleBackslashCandidates = collectLinkLabelSyntax(syntaxContent.content, linkLabels, codeRanges, mark);
-    collectUnmatchedOpeningBrackets(syntaxContent.content, codeRanges, markdownLinks, mark);
-    collectObsidianSyntax(syntaxContent.content, mark, linkLabels);
-    return `${optimizeMarkdownEscapes(content, escapeCandidates, syntaxContent.indentationLength, true, doubleBackslashCandidates)}${lineEnding}`;
+    return `${escapeObsidianLine(content)}${lineEnding}`;
   }).join("");
 }
 function collectSyntaxEscapes(line) {
@@ -373,8 +503,8 @@ function collectSyntaxEscapes(line) {
   collectReferenceLinkSyntax(line, mark);
   collectEmphasisSyntax(line, "*", mark);
   collectEmphasisSyntax(line, "_", mark);
-  collectPairedMarkerSyntax(line, "~", mark, () => 1);
-  collectPairedMarkerSyntax(line, "=", mark, () => 1);
+  collectPairedMarkerSyntax(line, "~", mark, () => 1, true);
+  collectPairedMarkerSyntax(line, "=", mark, () => 1, true);
   collectPairedMarkerSyntax(line, "$", mark, (length) => length);
   collectInlineCodeSyntax(line, mark);
   collectObsidianSyntax(line, mark);
@@ -402,7 +532,7 @@ function escapeMarkdownSyntax(text) {
   }).join("");
 }
 
-// src/md-editor-paste-handler.ts
+// src/escape-markdown-syntax/md-editor-paste-handler.ts
 var pendingHtmlPastes = /* @__PURE__ */ new WeakMap();
 function handleEditorPaste(event, view) {
   const target = event.target;
@@ -463,21 +593,27 @@ function handleEditorChange(editor) {
 }
 
 // src/wiki-paste-plugin-entry.ts
-var DEFAULT_SETTINGS = { escapeMarkdownSyntax: true };
+var DEFAULT_SETTINGS = { escapeMarkdownSyntax: true, autoExpandCanvasCards: true };
 var WikiPastePlugin = class extends import_obsidian.Plugin {
   async onload() {
     const savedSettings = await this.loadData();
     this.settings = {
-      escapeMarkdownSyntax: savedSettings?.escapeMarkdownSyntax ?? savedSettings?.escapeFootnoteReferences ?? DEFAULT_SETTINGS.escapeMarkdownSyntax
+      escapeMarkdownSyntax: savedSettings?.escapeMarkdownSyntax ?? savedSettings?.escapeFootnoteReferences ?? DEFAULT_SETTINGS.escapeMarkdownSyntax,
+      autoExpandCanvasCards: savedSettings?.autoExpandCanvasCards ?? DEFAULT_SETTINGS.autoExpandCanvasCards
     };
     this.addSettingTab(new WikiPasteSettingTab(this.app, this));
     this.registerDomEvent(document, "paste", (event) => {
-      if (!this.settings.escapeMarkdownSyntax) {
-        return;
+      if (this.settings.escapeMarkdownSyntax) {
+        const markdownView = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
+        if (markdownView) {
+          handleEditorPaste(event, markdownView);
+        }
       }
-      const view = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
-      if (view) {
-        handleEditorPaste(event, view);
+      if (this.settings.autoExpandCanvasCards) {
+        const activeView = this.app.workspace.activeLeaf?.view;
+        if (activeView) {
+          handleCanvasPaste(event, activeView);
+        }
       }
     }, { capture: true });
     this.registerEvent(this.app.workspace.on("editor-change", (editor) => {
@@ -490,6 +626,10 @@ var WikiPastePlugin = class extends import_obsidian.Plugin {
     this.settings.escapeMarkdownSyntax = enabled;
     await this.saveData(this.settings);
   }
+  async setCanvasAutoExpandEnabled(enabled) {
+    this.settings.autoExpandCanvasCards = enabled;
+    await this.saveData(this.settings);
+  }
 };
 var WikiPasteSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -500,5 +640,6 @@ var WikiPasteSettingTab = class extends import_obsidian.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     new import_obsidian.Setting(containerEl).setName("Escape pasted Markdown syntax").setDesc("Prevent Markdown and Obsidian syntax in plain-text pastes from being rendered as formatting.").addToggle((toggle) => toggle.setValue(this.plugin.settings.escapeMarkdownSyntax).onChange((enabled) => this.plugin.setMarkdownEscapingEnabled(enabled)));
+    new import_obsidian.Setting(containerEl).setName("Auto-expand pasted Canvas cards").setDesc("Resize text cards after pasting so their content is visible.").addToggle((toggle) => toggle.setValue(this.plugin.settings.autoExpandCanvasCards).onChange((enabled) => this.plugin.setCanvasAutoExpandEnabled(enabled)));
   }
 };

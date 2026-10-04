@@ -43,7 +43,13 @@ function collectEmphasisSyntax(line: string, marker: string, mark: EscapeMarker)
   }
 }
 
-function collectPairedMarkerSyntax(line: string, marker: string, mark: EscapeMarker, escapeOpeningLength: (length: number) => number): void {
+function collectPairedMarkerSyntax(
+  line: string,
+  marker: string,
+  mark: EscapeMarker,
+  escapeOpeningLength: (length: number) => number,
+  escapeClosingRun = false,
+): void {
   const runs = collectRuns(line, marker);
 
   for (let index = 0; index < runs.length; index += 1) {
@@ -61,7 +67,11 @@ function collectPairedMarkerSyntax(line: string, marker: string, mark: EscapeMar
       continue;
     }
 
+    const closing = runs[closingIndex];
     markRun(mark, opening.start, escapeOpeningLength(opening.length));
+    if (escapeClosingRun) {
+      markRun(mark, closing.start, escapeOpeningLength(closing.length));
+    }
     index = closingIndex;
   }
 }
@@ -256,6 +266,7 @@ function collectLinkLabelSyntax(
   labels: LinkLabelRange[],
   codeRanges: Array<{ start: number; end: number }>,
   mark: EscapeMarker,
+  isTableCell = false,
 ): Set<number> {
   const doubleBackslashCandidates = new Set<number>();
 
@@ -281,6 +292,7 @@ function collectLinkLabelSyntax(
         && punctuation !== undefined
         && punctuation !== "["
         && punctuation !== "]"
+        && !(isTableCell && punctuation === "|")
         && isMarkdownEscapablePunctuation(punctuation)) {
         doubleBackslashCandidates.add(index);
       }
@@ -350,6 +362,49 @@ function isEscapedByBackslash(line: string, index: number): boolean {
   return precedingSlashes % 2 === 1;
 }
 
+function escapeObsidianLine(content: string, isTableCell = false): string {
+  const syntaxContent = isTableCell
+    ? { content, indentationLength: 0 }
+    : getSyntaxContent(content);
+  if (syntaxContent.indentationLength > 0) {
+    return content;
+  }
+
+  const escapeCandidates = new Set<number>();
+  const codeRanges = collectInlineCodeRanges(syntaxContent.content);
+  const { labels: linkLabels, links: markdownLinks } = collectMarkdownLinks(syntaxContent.content, codeRanges);
+  const mark: EscapeMarker = (offset) => {
+    const insideInlineCode = isInsideRange(offset, codeRanges);
+    if (!insideInlineCode && !isEscapedByBackslash(syntaxContent.content, offset)) {
+      escapeCandidates.add(offset);
+    }
+  };
+  const doubleBackslashCandidates = collectLinkLabelSyntax(syntaxContent.content, linkLabels, codeRanges, mark, isTableCell);
+  collectUnmatchedOpeningBrackets(syntaxContent.content, codeRanges, markdownLinks, mark);
+  collectObsidianSyntax(syntaxContent.content, mark, linkLabels);
+
+  return optimizeMarkdownEscapes(content, escapeCandidates, syntaxContent.indentationLength, true, doubleBackslashCandidates);
+}
+
+function escapeMarkdownTableLine(line: string): string {
+  if (isMarkdownTableSeparator(line)) {
+    return line;
+  }
+
+  let output = "";
+  let cellStart = 0;
+  for (let index = 0; index < line.length; index += 1) {
+    if (line[index] !== "|" || isEscapedByBackslash(line, index)) {
+      continue;
+    }
+
+    output += `${escapeObsidianLine(line.slice(cellStart, index), true)}|`;
+    cellStart = index + 1;
+  }
+
+  return output + escapeObsidianLine(line.slice(cellStart), true);
+}
+
 export function escapeObsidianSyntax(text: string): string {
   const lines = text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
   const contentLines = lines.map((line) => line.replace(/\r?\n$/, ""));
@@ -374,25 +429,15 @@ export function escapeObsidianSyntax(text: string): string {
       return line;
     }
 
-    if (markdownTableLines.has(index) || getSyntaxContent(content).indentationLength > 0) {
+    if (markdownTableLines.has(index)) {
+      return `${escapeMarkdownTableLine(content)}${lineEnding}`;
+    }
+
+    if (getSyntaxContent(content).indentationLength > 0) {
       return line;
     }
 
-    const syntaxContent = getSyntaxContent(content);
-    const escapeCandidates = new Set<number>();
-    const codeRanges = collectInlineCodeRanges(syntaxContent.content);
-    const { labels: linkLabels, links: markdownLinks } = collectMarkdownLinks(syntaxContent.content, codeRanges);
-    const mark: EscapeMarker = (offset) => {
-      const insideInlineCode = isInsideRange(offset, codeRanges);
-      if (!insideInlineCode && !isEscapedByBackslash(syntaxContent.content, offset)) {
-        escapeCandidates.add(offset);
-      }
-    };
-    const doubleBackslashCandidates = collectLinkLabelSyntax(syntaxContent.content, linkLabels, codeRanges, mark);
-    collectUnmatchedOpeningBrackets(syntaxContent.content, codeRanges, markdownLinks, mark);
-    collectObsidianSyntax(syntaxContent.content, mark, linkLabels);
-
-    return `${optimizeMarkdownEscapes(content, escapeCandidates, syntaxContent.indentationLength, true, doubleBackslashCandidates)}${lineEnding}`;
+    return `${escapeObsidianLine(content)}${lineEnding}`;
   }).join("");
 }
 
@@ -404,8 +449,8 @@ function collectSyntaxEscapes(line: string): Set<number> {
   collectReferenceLinkSyntax(line, mark);
   collectEmphasisSyntax(line, "*", mark);
   collectEmphasisSyntax(line, "_", mark);
-  collectPairedMarkerSyntax(line, "~", mark, () => 1);
-  collectPairedMarkerSyntax(line, "=", mark, () => 1);
+  collectPairedMarkerSyntax(line, "~", mark, () => 1, true);
+  collectPairedMarkerSyntax(line, "=", mark, () => 1, true);
   collectPairedMarkerSyntax(line, "$", mark, (length) => length);
   collectInlineCodeSyntax(line, mark);
   collectObsidianSyntax(line, mark);

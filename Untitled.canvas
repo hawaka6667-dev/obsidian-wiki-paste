@@ -1,0 +1,7 @@
+{
+	"nodes":[
+		{"id":"6d1b8f6043baa32b","x":-140,"y":-80,"width":250,"height":60,"type":"text","text":"先把 pwn.college 的 File Globbing 做完；如果做完仍然觉得题量不足，\n再手搓一个 Regex-Crossword 风格的 Glob 题库。#todo"},
+		{"id":"dd021e0fd5622aa0","type":"text","text":"先把 pwn.college 的 File Globbing 做完；如果做完仍然觉得题量不足，\n再手搓一个 Regex-Crossword 风格的 Glob 题库。#todo","x":-140,"y":60,"width":563,"height":81}
+	],
+	"edges":[]
+}

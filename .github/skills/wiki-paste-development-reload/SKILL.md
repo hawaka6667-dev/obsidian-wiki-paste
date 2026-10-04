@@ -1,3 +1,20 @@
+## Routine code changes
+
+4. For a change to `src/` that fixes or adds behavior expected to work in
+   Obsidian, run `npm run build` and distribute the same build to both vaults
+   with `.dist/distribute.ps1` (default target: `Both`). This keeps plugin
+   versions and bundle contents aligned. Use `-Target Test` or `-Target Main`
+   only when the user explicitly requests a one-vault deployment. Verify vault
+   identity, copy, hashes, enabled state, and reload through the distribution
+   script; do not repeat those checks manually.
+## Explicit build and local delivery
+
+2. Distribute or reload for explicit local delivery requests. Use the target
+   resolution and safety checks built into the selected script; do not add
+   duplicate manual registry, enabled-state, or post-copy hash checks. If the
+   user specifies a target, use it. For an unspecified explicit local delivery,
+   use `Both`. Routine runtime closure follows step 4 above and also uses `Both`
+   unless the user explicitly requests a single vault.
 ---
 name: wiki-paste-development-reload
 description: 'MANDATORY for Wiki Paste code and metadata changes, and build, package, distribution, reload, release, or publish requests. Use focused source validation for routine edits, but close runtime behavior fixes by building and updating/reloading the affected local vault. GitHub publishing requires an explicit request. 中文触发词包括：改代码、加功能、修 bug、调试、重构、打包、分发、重载、本地 vault、发布、发版。'
@@ -44,14 +61,12 @@ fix complete until the affected enabled vault has loaded the matching bundle.
    `helper.md`. This workflow adds no broader test requirement for routine
    changes.
 4. For a change to `src/` that fixes or adds behavior expected to work in
-   Obsidian, run `npm run build` and distribute to the vault where that behavior
-   is being tested. For routine local verification, use `Test` (the workspace
-   vault) unless the user identifies another target. Verify the target against
-   `.publish-config.json` and Obsidian's vault registry through the selected
-   distribution script; do not run duplicate manual lookups. Never guess a
-   target: use the requested target or the workspace Test target. Do not default
-   routine fixes to `Both` or update the main vault unless requested or it is
-   the identified test target.
+   Obsidian, run `npm run build` and distribute the same build to both vaults
+   with `.dist/distribute.ps1` (default target: `Both`). This keeps plugin
+   versions and bundle contents aligned. Use `-Target Test` or `-Target Main`
+   only when the user explicitly requests a one-vault deployment. Verify vault
+   identity, copy, hashes, enabled state, and reload through the distribution
+   script; do not repeat those checks manually.
 5. Use `.dist/distribute.ps1 -Target <Test|Main|Both>` for this runtime closure.
    Trust the script's built-in target, copy, hash, enabled-state, and reload
    checks and its reported result. Do not repeat them manually with extra CLI
