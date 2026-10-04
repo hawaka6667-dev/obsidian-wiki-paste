@@ -5,7 +5,7 @@ Obsidian
 
 2 and can automatically expand text cards pasted onto Canvas.
 
-3 surppot canvas card copy to md
+3 surppot canvas card copy to md（#todo）
 
 ## Install manually
 https://community.obsidian.md/account/plugins/wiki-paste
