@@ -1,7 +1,7 @@
 {
   "id": "wiki-paste",
   "name": "Wiki Paste",
-  "version": "0.1.28",
+  "version": "0.1.29",
   "minAppVersion": "1.5.0",
   "description": "Preserve copied wiki text when pasting into Markdown.",
   "author": "hawaka6667-dev",
