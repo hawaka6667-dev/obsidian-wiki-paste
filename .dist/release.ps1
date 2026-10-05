@@ -33,7 +33,7 @@ if ((Get-Item -LiteralPath $bundlePath).Length -eq 0) {
     throw "Plugin bundle is empty: $bundlePath"
 }
 
-$tag = "v$version"
+$tag = $version
 
 if ((git branch --show-current) -ne "main") {
     throw "Releases must be published from main."
