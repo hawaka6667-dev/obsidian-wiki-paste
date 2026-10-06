@@ -4,6 +4,12 @@
 import { MarkdownView, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
 import { handleCanvasMarkdownPaste, handleCanvasPaste } from "./auto-expand-canvas/canvas-auto-expand";
 import {
+  clearRecentCanvasMarkdownCut,
+  clearCanvasMarkdownCutUnlessConsumed,
+  handleCanvasCut,
+  handleCardMarkdownPaste,
+} from "./card-copy-to-markdown/card-copy-to-markdown";
+import {
   clearRecentInternalMarkdownCopy,
   handleEditorChange,
   handleObsidianCopy,
@@ -13,13 +19,18 @@ import {
 interface WikiPasteSettings {
   escapeMarkdownSyntax: boolean;
   autoExpandCanvasCards: boolean;
+  canvasCardCopyToMarkdown: boolean;
 }
 
 interface StoredWikiPasteSettings extends Partial<WikiPasteSettings> {
   escapeFootnoteReferences?: boolean;
 }
 
-const DEFAULT_SETTINGS: WikiPasteSettings = { escapeMarkdownSyntax: true, autoExpandCanvasCards: true };
+const DEFAULT_SETTINGS: WikiPasteSettings = {
+  escapeMarkdownSyntax: true,
+  autoExpandCanvasCards: true,
+  canvasCardCopyToMarkdown: true,
+};
 
 export default class WikiPastePlugin extends Plugin {
   settings!: WikiPasteSettings;
@@ -31,18 +42,33 @@ export default class WikiPastePlugin extends Plugin {
         ?? savedSettings?.escapeFootnoteReferences
         ?? DEFAULT_SETTINGS.escapeMarkdownSyntax,
       autoExpandCanvasCards: savedSettings?.autoExpandCanvasCards ?? DEFAULT_SETTINGS.autoExpandCanvasCards,
+      canvasCardCopyToMarkdown: savedSettings?.canvasCardCopyToMarkdown ?? DEFAULT_SETTINGS.canvasCardCopyToMarkdown,
     };
     this.addSettingTab(new WikiPasteSettingTab(this.app, this));
 
     this.registerDomEvent(document, "copy", (event: ClipboardEvent) => {
       const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
       handleObsidianCopy(event, document, markdownView ?? undefined);
+      clearRecentCanvasMarkdownCut(document);
     });
-    this.registerDomEvent(window, "blur", () => clearRecentInternalMarkdownCopy(document));
+    this.registerDomEvent(document, "cut", (event: ClipboardEvent) => {
+      if (this.settings.canvasCardCopyToMarkdown) {
+        handleCanvasCut(event, document, this.app.workspace.activeLeaf?.view);
+      }
+    });
+    this.registerDomEvent(window, "blur", () => {
+      clearRecentInternalMarkdownCopy(document);
+      clearRecentCanvasMarkdownCut(document);
+    });
 
     this.registerDomEvent(document, "paste", (event: ClipboardEvent) => {
       const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
       const activeView = this.app.workspace.activeLeaf?.view;
+
+      const canvasMarkdownPasteHandled = this.settings.canvasCardCopyToMarkdown && markdownView
+        ? handleCardMarkdownPaste(event, markdownView)
+        : false;
+      clearCanvasMarkdownCutUnlessConsumed(document, canvasMarkdownPasteHandled);
 
       if (this.settings.escapeMarkdownSyntax) {
         if (markdownView) {
@@ -75,6 +101,18 @@ export default class WikiPastePlugin extends Plugin {
     this.settings.autoExpandCanvasCards = enabled;
     await this.saveData(this.settings);
   }
+
+  async setCanvasCardCopyToMarkdownEnabled(enabled: boolean): Promise<void> {
+    this.settings.canvasCardCopyToMarkdown = enabled;
+    if (!enabled) {
+      clearRecentCanvasMarkdownCut(document);
+    }
+    await this.saveData(this.settings);
+  }
+
+  onunload(): void {
+    clearRecentCanvasMarkdownCut(document);
+  }
 }
 
 class WikiPasteSettingTab extends PluginSettingTab {
@@ -102,5 +140,12 @@ class WikiPasteSettingTab extends PluginSettingTab {
       .addToggle((toggle) => toggle
         .setValue(this.plugin.settings.autoExpandCanvasCards)
         .onChange((enabled) => this.plugin.setCanvasAutoExpandEnabled(enabled)));
+
+    new Setting(containerEl)
+      .setName("Paste cut Canvas cards as Markdown")
+      .setDesc("Keep native Canvas cut behavior and paste a cut text card as Markdown in the editor.")
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.canvasCardCopyToMarkdown)
+        .onChange((enabled) => this.plugin.setCanvasCardCopyToMarkdownEnabled(enabled)));
   }
 }
