@@ -1,5 +1,5 @@
 // @machine:
-// Preserves native Canvas card cutting while allowing the next Markdown paste to use card Markdown.
+// Snapshots one selected Canvas text card on copy/cut and consumes its Markdown on the next editor paste.
 import type { MarkdownView } from "obsidian";
 
 interface CanvasNodeData {
@@ -13,74 +13,71 @@ interface CanvasNode {
 
 interface CanvasView {
   getViewType: () => string;
-  canvas: {
-    selection?: Set<CanvasNode>;
+  containerEl: HTMLElement;
+  canvas?: {
+    selection?: Iterable<CanvasNode>;
   };
 }
 
-const recentCanvasMarkdownCuts = new WeakMap<Document, { text: string }>();
+const pendingCanvasMarkdown = new WeakMap<Document, string>();
 
-export function handleCanvasCut(event: ClipboardEvent, document: Document, view: unknown): boolean {
-  recentCanvasMarkdownCuts.delete(document);
-  if (event.defaultPrevented) {
-    return false;
-  }
-
-  if (!isCanvasView(view)) {
+export function handleCanvasCardClipboardEvent(event: ClipboardEvent, document: Document, view: unknown): boolean {
+  pendingCanvasMarkdown.delete(document);
+  if (event.defaultPrevented || !isCanvasView(view)) {
     return false;
   }
 
   const target = event.target as Element | null;
-  if (target?.closest?.(".cm-content")) {
+  if (!target || target.closest(".cm-content") || !view.containerEl.contains(target)) {
     return false;
   }
 
-  const selection = view.canvas.selection;
-  if (!(selection instanceof Set) || selection.size !== 1) {
+  const canvas = view.canvas;
+  if (!canvas) {
     return false;
   }
 
-  const selectedNode = selection.values().next().value as CanvasNode | undefined;
+  const selection = canvas.selection;
+  if (!selection || typeof selection[Symbol.iterator] !== "function") {
+    return false;
+  }
+
+  const selectedNodes = Array.from(selection);
+  if (selectedNodes.length !== 1) {
+    return false;
+  }
+
+  const selectedNode = selectedNodes[0];
   const data = selectedNode?.getData?.();
-  if (data?.type !== "text" || typeof data.text !== "string" || !data.text) {
+  if (data?.type !== "text" || typeof data.text !== "string" || data.text.length === 0) {
     return false;
   }
 
-  recentCanvasMarkdownCuts.set(document, { text: data.text });
+  pendingCanvasMarkdown.set(document, data.text);
   return true;
 }
 
-export function clearRecentCanvasMarkdownCut(document: Document): void {
-  recentCanvasMarkdownCuts.delete(document);
+export function clearPendingCanvasMarkdown(document: Document): void {
+  pendingCanvasMarkdown.delete(document);
 }
 
-export function handleCardMarkdownPaste(event: ClipboardEvent, view: MarkdownView): boolean {
+export function handleCardMarkdownPaste(event: ClipboardEvent, document: Document, view: MarkdownView | null): boolean {
+  const markdown = pendingCanvasMarkdown.get(document);
+  if (markdown === undefined) {
+    return false;
+  }
+
   const target = event.target as Element | null;
-  if (!target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
+  if (!view || !target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
+    pendingCanvasMarkdown.delete(document);
     return false;
   }
 
-  const clipboardData = event.clipboardData;
-  if (!clipboardData?.getData("text/plain") && !clipboardData?.getData("text/html")) {
-    return false;
-  }
-
-  const cut = recentCanvasMarkdownCuts.get(view.containerEl.ownerDocument);
-  if (!cut) {
-    return false;
-  }
-
-  recentCanvasMarkdownCuts.delete(view.containerEl.ownerDocument);
+  pendingCanvasMarkdown.delete(document);
   event.preventDefault();
   event.stopPropagation();
-  view.editor.replaceSelection(cut.text);
+  view.editor.replaceSelection(markdown);
   return true;
-}
-
-export function clearCanvasMarkdownCutUnlessConsumed(document: Document, consumed: boolean): void {
-  if (!consumed) {
-    recentCanvasMarkdownCuts.delete(document);
-  }
 }
 
 function isCanvasView(view: unknown): view is CanvasView {
@@ -90,5 +87,5 @@ function isCanvasView(view: unknown): view is CanvasView {
 
   const candidate = view as CanvasView;
   return candidate.getViewType?.() === "canvas"
-    && candidate.canvas?.selection instanceof Set;
+    && Boolean(candidate.containerEl && candidate.canvas);
 }

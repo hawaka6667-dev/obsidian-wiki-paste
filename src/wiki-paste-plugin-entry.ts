@@ -4,9 +4,8 @@
 import { MarkdownView, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
 import { handleCanvasMarkdownPaste, handleCanvasPaste } from "./auto-expand-canvas/canvas-auto-expand";
 import {
-  clearRecentCanvasMarkdownCut,
-  clearCanvasMarkdownCutUnlessConsumed,
-  handleCanvasCut,
+  clearPendingCanvasMarkdown,
+  handleCanvasCardClipboardEvent,
   handleCardMarkdownPaste,
 } from "./card-copy-to-markdown/card-copy-to-markdown";
 import {
@@ -47,28 +46,31 @@ export default class WikiPastePlugin extends Plugin {
     this.addSettingTab(new WikiPasteSettingTab(this.app, this));
 
     this.registerDomEvent(document, "copy", (event: ClipboardEvent) => {
+      if (this.settings.canvasCardCopyToMarkdown) {
+        handleCanvasCardClipboardEvent(event, document, this.app.workspace.activeLeaf?.view);
+      }
+    }, { capture: true });
+    this.registerDomEvent(document, "copy", (event: ClipboardEvent) => {
       const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
       handleObsidianCopy(event, document, markdownView ?? undefined);
-      clearRecentCanvasMarkdownCut(document);
     });
     this.registerDomEvent(document, "cut", (event: ClipboardEvent) => {
       if (this.settings.canvasCardCopyToMarkdown) {
-        handleCanvasCut(event, document, this.app.workspace.activeLeaf?.view);
+        handleCanvasCardClipboardEvent(event, document, this.app.workspace.activeLeaf?.view);
       }
-    });
+    }, { capture: true });
     this.registerDomEvent(window, "blur", () => {
       clearRecentInternalMarkdownCopy(document);
-      clearRecentCanvasMarkdownCut(document);
+      clearPendingCanvasMarkdown(document);
     });
 
     this.registerDomEvent(document, "paste", (event: ClipboardEvent) => {
       const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
       const activeView = this.app.workspace.activeLeaf?.view;
 
-      const canvasMarkdownPasteHandled = this.settings.canvasCardCopyToMarkdown && markdownView
-        ? handleCardMarkdownPaste(event, markdownView)
-        : false;
-      clearCanvasMarkdownCutUnlessConsumed(document, canvasMarkdownPasteHandled);
+      if (this.settings.canvasCardCopyToMarkdown && handleCardMarkdownPaste(event, document, markdownView)) {
+        return;
+      }
 
       if (this.settings.escapeMarkdownSyntax) {
         if (markdownView) {
@@ -105,13 +107,13 @@ export default class WikiPastePlugin extends Plugin {
   async setCanvasCardCopyToMarkdownEnabled(enabled: boolean): Promise<void> {
     this.settings.canvasCardCopyToMarkdown = enabled;
     if (!enabled) {
-      clearRecentCanvasMarkdownCut(document);
+      clearPendingCanvasMarkdown(document);
     }
     await this.saveData(this.settings);
   }
 
   onunload(): void {
-    clearRecentCanvasMarkdownCut(document);
+    clearPendingCanvasMarkdown(document);
   }
 }
 
@@ -142,8 +144,8 @@ class WikiPasteSettingTab extends PluginSettingTab {
         .onChange((enabled) => this.plugin.setCanvasAutoExpandEnabled(enabled)));
 
     new Setting(containerEl)
-      .setName("Paste cut Canvas cards as Markdown")
-      .setDesc("Keep native Canvas cut behavior and paste a cut text card as Markdown in the editor.")
+      .setName("Paste copied or cut Canvas cards to Markdown")
+      .setDesc("Paste a single copied or cut Canvas text card as Markdown in the editor.")
       .addToggle((toggle) => toggle
         .setValue(this.plugin.settings.canvasCardCopyToMarkdown)
         .onChange((enabled) => this.plugin.setCanvasCardCopyToMarkdownEnabled(enabled)));

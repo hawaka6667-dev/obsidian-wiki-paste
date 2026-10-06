@@ -1,11 +1,8 @@
 # Wiki Paste
 
-1 Wiki Paste helps prevent Markdown syntax collisions when pasting web content into
-Obsidian 
-
-2 and can automatically expand text cards pasted onto Canvas.
-
-3 surppot canvas card copy to md（#todo）
+Wiki Paste preserves literal Markdown syntax when pasting web content into
+Obsidian, expands pasted Canvas text cards, and lets you copy or cut a single
+Canvas text card and paste its Markdown into the editor.
 
 ## Install manually
 https://community.obsidian.md/account/plugins/wiki-paste

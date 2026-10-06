@@ -31,7 +31,7 @@
 ## Current Behavior
 
 - Plugin id: `wiki-paste`; minimum Obsidian version: `1.5.0`.
-- Both feature settings are enabled by default and persisted independently with
+- All three feature settings are enabled by default and persisted independently with
 	Obsidian `loadData` / `saveData`; `escapeFootnoteReferences` is a migration
 	fallback for the Markdown escaping setting.
 - Paste and syntax-escaping behavior is documented in
@@ -74,10 +74,29 @@
 - Visual test: use a Canvas fixture in `local-testing/`; compare the rendered
 	content and card bounds for the developer-selected scenario.
 
+### Paste Canvas text cards as Markdown
+
+- Setting: `canvasCardCopyToMarkdown`, enabled by default and independent of
+	`escapeMarkdownSyntax` and `autoExpandCanvasCards`.
+- Boundary: on native Canvas `copy` or `cut`, snapshot the sole selected text
+	node's `getData().text` without preventing the native clipboard or cut action.
+	The next paste into a Markdown editor consumes that one-shot Markdown value,
+	without requiring native clipboard MIME data; multi-selection and non-text
+	cards are left to Obsidian.
+- Confirmed user scenario: copy or cut one text card, switch to a Markdown
+	editor, and paste; verify exact Markdown insertion and unchanged native copy/
+	cut behavior. Automated coverage includes copy/cut snapshots, MIME-free paste,
+	one-shot consumption, and clearing on non-editor paste; run
+	`npx tsx --test tests/card-copy-to-markdown.test.mjs`.
+
 ## Global Paste Execution Order
 
 - `src/wiki-paste-plugin-entry.ts` registers one document capture-phase paste
 	listener. It resolves the active `MarkdownView` and active leaf view first.
+- On paste, `handleCardMarkdownPaste` gets first refusal when a Canvas card
+	Markdown snapshot is pending; a successful insertion stops this plugin's
+	later paste handlers. Without pending card Markdown, normal escaping and
+	Canvas auto-expand handling proceed unchanged.
 - When `escapeMarkdownSyntax` is enabled, an active Markdown view is sent to
 	`handleEditorPaste`; otherwise the active view is sent to
 	`handleCanvasMarkdownPaste` (which accepts Canvas views only).
@@ -96,6 +115,9 @@
 - `src/auto-expand-canvas/canvas-auto-expand.ts`: post-processes external Canvas
 	paste text when Markdown escaping is enabled; identifies Canvas resize targets,
 	measures rendered content, and persists expanded dimensions.
+- `src/card-copy-to-markdown/card-copy-to-markdown.ts`: snapshots selected text
+	cards on native Canvas copy/cut and consumes the Markdown on the next editor
+	paste.
 - `src/escape-markdown-syntax/md-editor-paste-handler.ts`: editor-target guard, rich-HTML
 	paste snapshot, Obsidian copy provenance, post-conversion change handling,
 	plain-text transformation, and selection replacement.

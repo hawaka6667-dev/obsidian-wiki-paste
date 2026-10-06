@@ -2,108 +2,125 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { JSDOM } from "jsdom";
 import {
-  clearCanvasMarkdownCutUnlessConsumed,
-  clearRecentCanvasMarkdownCut,
-  handleCanvasCut,
-  handleCardMarkdownPaste,
+	clearPendingCanvasMarkdown,
+	handleCanvasCardClipboardEvent,
+	handleCardMarkdownPaste,
 } from "../src/card-copy-to-markdown/card-copy-to-markdown.ts";
 
-function createEvent(target, values = {}) {
-  let defaultPrevented = false;
-  let propagationStopped = false;
-  return {
-    target,
-    clipboardData: { getData: (type) => values[type] ?? "" },
-    preventDefault() {
-      defaultPrevented = true;
-    },
-    stopPropagation() {
-      propagationStopped = true;
-    },
-    get defaultPrevented() {
-      return defaultPrevented;
-    },
-    get propagationStopped() {
-      return propagationStopped;
-    },
-  };
+function createEvent(target, type = "paste", hasClipboardData = true) {
+	let defaultPrevented = false;
+	let propagationStopped = false;
+	return {
+		type,
+		target,
+		clipboardData: hasClipboardData ? { getData: () => "" } : null,
+		preventDefault() {
+			defaultPrevented = true;
+		},
+		stopPropagation() {
+			propagationStopped = true;
+		},
+		get defaultPrevented() {
+			return defaultPrevented;
+		},
+		get propagationStopped() {
+			return propagationStopped;
+		},
+	};
 }
 
-test("keeps native Canvas cut behavior and pastes a text card as Markdown", () => {
-  const dom = new JSDOM("<div class='canvas'><div class='canvas-node'></div></div><div class='editor'><div class='cm-content'></div></div>");
-  const canvasContainer = dom.window.document.querySelector(".canvas");
-  const editorContainer = dom.window.document.querySelector(".editor");
-  const canvasNode = canvasContainer.querySelector(".canvas-node");
-  const editorContent = editorContainer.querySelector(".cm-content");
-  const replacements = [];
-  const markdownView = {
-    containerEl: editorContainer,
-    editor: { replaceSelection: (text) => replacements.push(text) },
-  };
-  const canvasView = {
-    getViewType: () => "canvas",
-    canvas: {
-      selection: new Set([{ getData: () => ({ type: "text", text: "# Card\n\nBody" }) }]),
-    },
-  };
+function createCanvasView(containerEl, selection) {
+	return {
+		getViewType: () => "canvas",
+		containerEl,
+		canvas: { selection },
+	};
+}
 
-  const cut = createEvent(canvasNode, { "text/plain": "native canvas payload" });
-  assert.equal(handleCanvasCut(cut, dom.window.document, canvasView), true);
-  assert.equal(cut.defaultPrevented, false);
+test("preserves native copy and cut and pastes a text card without clipboard MIME data", () => {
+	const dom = new JSDOM("<div class='canvas'><div class='canvas-node'></div></div><div class='editor'><div class='cm-content'></div></div>");
+	const document = dom.window.document;
+	const canvasContainer = document.querySelector(".canvas");
+	const canvasNode = document.querySelector(".canvas-node");
+	const editorContainer = document.querySelector(".editor");
+	const editorContent = document.querySelector(".cm-content");
+	const replacements = [];
+	const markdownView = {
+		containerEl: editorContainer,
+		editor: { replaceSelection: (text) => replacements.push(text) },
+	};
+	const canvasView = createCanvasView(canvasContainer, new Set([
+		{ getData: () => ({ type: "text", text: "# Card\n\nBody" }) },
+	]));
 
-  const paste = createEvent(editorContent, { "text/plain": "native canvas payload" });
-  assert.equal(handleCardMarkdownPaste(paste, markdownView), true);
-  assert.deepEqual(replacements, ["# Card\n\nBody"]);
-  assert.equal(paste.defaultPrevented, true);
-  assert.equal(paste.propagationStopped, true);
+	for (const type of ["copy", "cut"]) {
+		const clipboardEvent = createEvent(canvasNode, type);
+		assert.equal(handleCanvasCardClipboardEvent(clipboardEvent, document, canvasView), true);
+		assert.equal(clipboardEvent.defaultPrevented, false);
 
-  clearRecentCanvasMarkdownCut(dom.window.document);
-  dom.window.close();
+		const paste = createEvent(editorContent, "paste", false);
+		assert.equal(handleCardMarkdownPaste(paste, document, markdownView), true);
+		assert.equal(paste.defaultPrevented, true);
+		assert.equal(paste.propagationStopped, true);
+		assert.equal(handleCardMarkdownPaste(createEvent(editorContent), document, markdownView), false);
+	}
+
+	assert.deepEqual(replacements, ["# Card\n\nBody", "# Card\n\nBody"]);
+	clearPendingCanvasMarkdown(document);
+	dom.window.close();
 });
 
-test("leaves multi-card and non-text cuts untouched", () => {
-  const dom = new JSDOM("<div class='canvas'><div class='canvas-node'></div></div>");
-  const canvasNode = dom.window.document.querySelector(".canvas-node");
-  const textNode = { getData: () => ({ type: "text", text: "one" }) };
-  const cut = createEvent(canvasNode, { "text/plain": "native canvas payload" });
+test("ignores multi-card and non-text selections", () => {
+	const dom = new JSDOM("<div class='canvas'><div class='canvas-node'></div></div><div class='editor'><div class='cm-content'></div></div>");
+	const document = dom.window.document;
+	const canvasContainer = document.querySelector(".canvas");
+	const canvasNode = document.querySelector(".canvas-node");
+	const editorContainer = document.querySelector(".editor");
+	const markdownView = {
+		containerEl: editorContainer,
+		editor: { replaceSelection: () => assert.fail("unsupported selection was pasted") },
+	};
+	const textNode = { getData: () => ({ type: "text", text: "one" }) };
 
-  assert.equal(handleCanvasCut(cut, dom.window.document, {
-    getViewType: () => "canvas",
-    canvas: { selection: new Set([textNode, { getData: () => ({ type: "text", text: "two" }) }]) },
-  }), false);
-  assert.equal(handleCanvasCut(cut, dom.window.document, {
-    getViewType: () => "canvas",
-    canvas: { selection: new Set([{ getData: () => ({ type: "file", file: "note.md" }) }]) },
-  }), false);
+	assert.equal(handleCanvasCardClipboardEvent(createEvent(canvasNode, "copy"), document, createCanvasView(
+		canvasContainer,
+		new Set([textNode, { getData: () => ({ type: "text", text: "two" }) }]),
+	)), false);
+	assert.equal(handleCardMarkdownPaste(createEvent(editorContainer.querySelector(".cm-content")), document, markdownView), false);
 
-  dom.window.close();
+	assert.equal(handleCanvasCardClipboardEvent(createEvent(canvasNode, "cut"), document, createCanvasView(
+		canvasContainer,
+		new Set([{ getData: () => ({ type: "file", file: "note.md" }) }]),
+	)), false);
+	assert.equal(handleCardMarkdownPaste(createEvent(editorContainer.querySelector(".cm-content")), document, markdownView), false);
+	dom.window.close();
 });
 
-test("clears a pending card cut after an unrelated paste and ignores handled cuts", () => {
-  const dom = new JSDOM("<div class='canvas'><div class='canvas-node'></div></div><div class='editor'><div class='cm-content'></div></div>");
-  const canvasNode = dom.window.document.querySelector(".canvas-node");
-  const editorContainer = dom.window.document.querySelector(".editor");
-  const editorContent = editorContainer.querySelector(".cm-content");
-  const markdownView = {
-    containerEl: editorContainer,
-    editor: { replaceSelection: () => assert.fail("stale card cut was consumed") },
-  };
-  const canvasView = {
-    getViewType: () => "canvas",
-    canvas: {
-      selection: new Set([{ getData: () => ({ type: "text", text: "stale" }) }]),
-    },
-  };
+test("clears pending Markdown after a non-editor paste or an already-handled clipboard event", () => {
+	const dom = new JSDOM("<div class='canvas'><div class='canvas-node'></div></div><div class='editor'><div class='cm-content'></div></div>");
+	const document = dom.window.document;
+	const canvasContainer = document.querySelector(".canvas");
+	const canvasNode = document.querySelector(".canvas-node");
+	const editorContainer = document.querySelector(".editor");
+	const editorContent = document.querySelector(".cm-content");
+	const markdownView = {
+		containerEl: editorContainer,
+		editor: { replaceSelection: () => assert.fail("stale card Markdown was consumed") },
+	};
+	const canvasView = createCanvasView(canvasContainer, new Set([
+		{ getData: () => ({ type: "text", text: "stale" }) },
+	]));
 
-  assert.equal(handleCanvasCut(createEvent(canvasNode), dom.window.document, canvasView), true);
-  clearCanvasMarkdownCutUnlessConsumed(dom.window.document, false);
-  assert.equal(handleCardMarkdownPaste(createEvent(editorContent, { "text/plain": "native" }), markdownView), false);
+	assert.equal(handleCanvasCardClipboardEvent(createEvent(canvasNode, "copy"), document, canvasView), true);
+	assert.equal(handleCardMarkdownPaste(createEvent(canvasContainer), document, markdownView), false);
+	assert.equal(handleCardMarkdownPaste(createEvent(editorContent), document, markdownView), false);
 
-  const handledCut = createEvent(canvasNode);
-  handledCut.preventDefault();
-  assert.equal(handleCanvasCut(handledCut, dom.window.document, canvasView), false);
-  assert.equal(handleCardMarkdownPaste(createEvent(editorContent, { "text/plain": "native" }), markdownView), false);
+	assert.equal(handleCanvasCardClipboardEvent(createEvent(canvasNode, "copy"), document, canvasView), true);
+	const handledCut = createEvent(canvasNode, "cut");
+	handledCut.preventDefault();
+	assert.equal(handleCanvasCardClipboardEvent(handledCut, document, canvasView), false);
+	assert.equal(handleCardMarkdownPaste(createEvent(editorContent), document, markdownView), false);
 
-  clearRecentCanvasMarkdownCut(dom.window.document);
-  dom.window.close();
+	clearPendingCanvasMarkdown(document);
+	dom.window.close();
 });
