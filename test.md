@@ -1,7 +1,10 @@
 @machine   此条目deprecated 我自己维护
 
 
-
+高级模式       channel
+web escape
+paste as html
+ob 
 
 点card粘贴的hack
 
@@ -31,7 +34,6 @@ https://github.com/joeytoday/obsidian-canvas-enhance 抄作业
 - 重点核对宽度变化、长 Markdown、图片/异步内容、编辑态与预览态，以及 Canvas 布局/渲染时序；每次在 Obsidian 里记录卡片尺寸和预览区 `scrollHeight`、`clientHeight`，确认无滚动条。
 - 暂不沿用“live DOM 高度连续稳定后再扩展”的轮询方案：已有试验未消除溢出。社区实现可作为机制参考（Canvas Enhance 的更新事件与合帧调整；Node Autosize 的最终宽度离屏测量及扩展后溢出修正），但不要直接依赖未验证的私有 Canvas API。
 - A/B 约束不变：候选仅分发到 GameDevVault，wiki paste 保持基线；两侧相关设置维持开启。Markdown escape 的 `==` 行为和 `&nbsp;` 来源仍排除在本任务之外。
-
 
 
 

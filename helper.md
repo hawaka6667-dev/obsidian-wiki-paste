@@ -34,6 +34,9 @@
 - All three feature settings are enabled by default and persisted independently with
 	Obsidian `loadData` / `saveData`; `escapeFootnoteReferences` is a migration
 	fallback for the Markdown escaping setting.
+- The fourth setting, `showPasteOptionsPopup`, is enabled by default and displays
+	an inert Word-style options popup after Markdown-editor paste. Its menu choices
+	only dismiss the popup; they do not change pasted content or call an API.
 - Paste and syntax-escaping behavior is documented in
 	[md-syntax-escaping.md](md-syntax-escaping.md) as input/output cases; do not
 	duplicate the case list in this quick-context file.
@@ -45,8 +48,8 @@
 - Setting: `escapeMarkdownSyntax`, enabled by default.
 - Boundary: applies to external web-to-Obsidian pastes in the Markdown editor
 	or Canvas. It does not modify Obsidian-to-Obsidian copies. Matching internal
-	copies are bypassed by a one-shot exact-text provenance marker, cleared on
-	window blur; there is no time-based expiry.
+	copies and cuts are bypassed by a one-shot exact-text provenance marker,
+	cleared on window blur; there is no time-based expiry.
 - Plain text uses `escapeMarkdownSyntax`; rich HTML is handled after Obsidian's
 	native conversion with `escapeObsidianSyntax`. Canvas conversion remains
 	native; only newly added or changed text-node content is post-processed.
@@ -55,7 +58,7 @@
 	should be checked after changes to `md-syntax-escaping.ts`.
 - Automated tests: `tests/md-syntax-escaping.test.mjs` covers syntax outputs;
 	`tests/md-editor-paste-handler.test.mjs` covers Markdown-editor external vs
-	internal paste behavior; `tests/canvas-auto-expand.test.mjs` covers external
+	internal copy/cut paste behavior; `tests/canvas-auto-expand.test.mjs` covers external
 	plain/rich Canvas escaping and internal-copy preservation.
 - Visual test: use the developer-selected external-paste scenario in
 	`local-testing/`; verify syntax stays literal in both Markdown editor and
@@ -89,6 +92,15 @@
 	one-shot consumption, and clearing on non-editor paste; run
 	`npx tsx --test tests/card-copy-to-markdown.test.mjs`.
 
+### Show paste options popup
+
+- Setting: `showPasteOptionsPopup`, enabled by default and persisted independently.
+- Boundary: after paste events originating inside the Markdown editor, show a
+	visual popup with three inert options. Ctrl opens the menu; Up/Down move
+	focus through the options and Enter dismisses the selected option. Selection
+	does not change editor content, clipboard data, or paste formatting. Popup
+	positioning is not yet recorded as a verified behavior.
+
 ## Global Paste Execution Order
 
 - `src/wiki-paste-plugin-entry.ts` registers one document capture-phase paste
@@ -119,8 +131,11 @@
 	cards on native Canvas copy/cut and consumes the Markdown on the next editor
 	paste.
 - `src/escape-markdown-syntax/md-editor-paste-handler.ts`: editor-target guard, rich-HTML
-	paste snapshot, Obsidian copy provenance, post-conversion change handling,
+	paste snapshot, Obsidian copy/cut provenance, post-conversion change handling,
 	plain-text transformation, and selection replacement.
+- `src/paste-options/paste-options-popup.ts`: renders, positions, and handles
+	keyboard interaction for the inert post-paste options popup; menu choices
+	do not modify editor or clipboard data.
 - `md-syntax-escaping.md`: curated syntax-escaping input/output cases.
 - `src/escape-markdown-syntax/md-syntax-escaping.ts` and
   `src/escape-markdown-syntax/md-escape-optimization.ts`: syntax
@@ -159,16 +174,18 @@ npm run build
 - `.dist/build.mjs` keeps the two highest numeric version directories. If a
 	previous Release package is missing during initial setup, seed it into
 	`.dist/<version>` once; normal distribution uses local packages only.
-- For A/B delivery, run `npm run build` followed by
--	`pwsh -File .dist/distribute.ps1`. The default target is `Candidate`
--	(`GameDevVault`, current root version); `-Target Baseline` selects
--	`wiki paste`, and `-Target Both` plans both roles. Use `-CandidateVersion` and
--	`-BaselineVersion` to select each local package independently, or `-Version`
--	to override every selected target. Baseline feature settings are preserved;
--	they are disabled only when `-DisableBaselineOptions` is explicit. Use
--	`-PlanOnly` to inspect package selection without touching vaults. The script
--	verifies bundle hashes and reloads only enabled plugin copies; it does not
--	enable a disabled plugin.
+- Every project version change, including version-only changes, requires the
+	complete sequence: `npm run build`, then
+	`pwsh -File .dist/distribute.ps1 -Target Candidate`. Build without
+	distribution is incomplete. An explicitly requested target replaces
+	`Candidate`.
+- For A/B delivery, `-Target Baseline` selects `wiki paste`, and `-Target Both`
+	plans both roles. Use `-CandidateVersion` and `-BaselineVersion` to select
+	each local package independently, or `-Version` to override every selected
+	target. Baseline feature settings are preserved; they are disabled only when
+	`-DisableBaselineOptions` is explicit. Use `-PlanOnly` to inspect package
+	selection without touching vaults. The script verifies bundle hashes and
+	reloads only enabled plugin copies; it does not enable a disabled plugin.
 - `.dist/reload.ps1` validates the installed manifest and requested version
 	before reloading; the distribution script passes the expected version for
 	each vault.

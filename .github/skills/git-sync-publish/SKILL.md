@@ -2,6 +2,7 @@
 name: git-sync-publish
 description: 'Git 同步与快速发布工作流。用户要求 git sync、同步并推送，或说 publish、release、发版时使用；本项目默认发布 GitHub Release。'
 ---
+warning：修bug前先sync
 
 # git sync and publish
 

@@ -1,6 +1,6 @@
 // @machine:
 // Handles paste events inside the active Obsidian Markdown editor.
-// Tracks in-editor copies so matching Markdown pastes bypass webpage syntax escaping.
+// Tracks in-editor copies and cuts so matching Markdown pastes bypass webpage syntax escaping.
 // Snapshots external rich pastes and post-processes Obsidian's conversion on editor-change.
 import type { Editor, MarkdownView } from "obsidian";
 import { escapeMarkdownSyntax, escapeObsidianSyntax } from "./md-syntax-escaping";
@@ -15,6 +15,15 @@ const pendingHtmlPastes = new WeakMap<Editor, PendingHtmlPaste>();
 const recentInternalMarkdownCopies = new WeakMap<Document, { text: string }>();
 
 export function handleEditorCopy(event: ClipboardEvent, view: MarkdownView): boolean {
+  return handleObsidianCopy(event, view.containerEl.ownerDocument, view);
+}
+
+export function handleEditorCut(event: ClipboardEvent, view?: MarkdownView): boolean {
+  const target = event.target as Element | null;
+  if (!view || !target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
+    return false;
+  }
+
   return handleObsidianCopy(event, view.containerEl.ownerDocument, view);
 }
 

@@ -1,4 +1,4 @@
-# @machine: Plans and distributes selected candidate/baseline packages to configured A/B vaults, verifies package hashes, optionally changes baseline settings, and reloads enabled copies.
+# @machine: Plans and distributes complete plugin packages (manifest.json, main.js, styles.css) to configured A/B vaults, verifies every file hash, optionally changes baseline settings, and reloads enabled copies.
 param(
     [ValidateSet('Candidate', 'Baseline', 'GameDevVault', 'wiki paste', 'Both')]
     [string]$Target = 'Candidate',
@@ -83,16 +83,17 @@ $distributionPlan = @(
         $releasePath = Join-Path $distRoot $targetVersion
         $manifestPath = Join-Path $releasePath 'manifest.json'
         $bundlePath = Join-Path $releasePath 'main.js'
-        if (-not (Test-Path -LiteralPath $manifestPath) -or -not (Test-Path -LiteralPath $bundlePath)) {
-            throw "Local package '$targetVersion' is incomplete or missing: $releasePath. Build it locally or seed this version from its GitHub Release first."
+        $stylesPath = Join-Path $releasePath 'styles.css'
+        if (-not (Test-Path -LiteralPath $manifestPath) -or -not (Test-Path -LiteralPath $bundlePath) -or -not (Test-Path -LiteralPath $stylesPath)) {
+            throw "Local package '$targetVersion' must include manifest.json, main.js, and styles.css: $releasePath. Build it locally or seed this version from its GitHub Release first."
         }
 
         $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
         if ($manifest.id -ne $sourceManifest.id -or $manifest.version -ne $targetVersion) {
             throw "Package manifest does not match plugin '$($sourceManifest.id)' version '$targetVersion': $manifestPath"
         }
-        if ((Get-Item -LiteralPath $bundlePath).Length -eq 0) {
-            throw "Build output is empty: $bundlePath"
+        if ((Get-Item -LiteralPath $bundlePath).Length -eq 0 -or (Get-Item -LiteralPath $stylesPath).Length -eq 0) {
+            throw "Build output is empty: $releasePath"
         }
 
         [PSCustomObject]@{
@@ -103,6 +104,7 @@ $distributionPlan = @(
             Manifest = $manifest
             ManifestPath = $manifestPath
             BundlePath = $bundlePath
+            StylesPath = $stylesPath
         }
     }
 )
@@ -238,16 +240,23 @@ foreach ($targetVault in $distributionPlan) {
 foreach ($targetVault in $distributionPlan) {
     $destination = Join-Path $targetVault.Path ".obsidian\plugins\$($targetVault.Manifest.id)"
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
-    Copy-Item -LiteralPath $targetVault.ManifestPath -Destination (Join-Path $destination 'manifest.json') -Force
-    Copy-Item -LiteralPath $targetVault.BundlePath -Destination (Join-Path $destination 'main.js') -Force
+    $packageFiles = @(
+        [PSCustomObject]@{ Name = 'manifest.json'; Source = $targetVault.ManifestPath }
+        [PSCustomObject]@{ Name = 'main.js'; Source = $targetVault.BundlePath }
+        [PSCustomObject]@{ Name = 'styles.css'; Source = $targetVault.StylesPath }
+    )
+    foreach ($packageFile in $packageFiles) {
+        $destinationFile = Join-Path $destination $packageFile.Name
+        Copy-Item -LiteralPath $packageFile.Source -Destination $destinationFile -Force
 
-    $sourceHash = (Get-FileHash -LiteralPath $targetVault.BundlePath -Algorithm SHA256).Hash
-    $destinationHash = (Get-FileHash -LiteralPath (Join-Path $destination 'main.js') -Algorithm SHA256).Hash
-    if ($sourceHash -ne $destinationHash) {
-        throw "The distributed bundle hash does not match the source for '$($targetVault.Path)'."
+        $sourceHash = (Get-FileHash -LiteralPath $packageFile.Source -Algorithm SHA256).Hash
+        $destinationHash = (Get-FileHash -LiteralPath $destinationFile -Algorithm SHA256).Hash
+        if ($sourceHash -ne $destinationHash) {
+            throw "The distributed '$($packageFile.Name)' hash does not match the source for '$($targetVault.Path)'."
+        }
+        Write-Host "Verified '$($packageFile.Name)' SHA-256: $sourceHash"
     }
     Write-Host "Distributed '$($targetVault.Manifest.id)' version '$($targetVault.Version)' to '$($targetVault.Name)'."
-    Write-Host "Bundle SHA-256: $sourceHash"
 }
 
 if ($DisableBaselineOptions) {

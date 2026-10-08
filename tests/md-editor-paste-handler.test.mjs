@@ -5,6 +5,7 @@ import {
   clearRecentInternalMarkdownCopy,
   handleEditorChange,
   handleEditorCopy,
+  handleEditorCut,
   handleEditorPaste,
 } from "../src/escape-markdown-syntax/md-editor-paste-handler.ts";
 
@@ -57,6 +58,34 @@ test("preserves Markdown copied inside Obsidian but still escapes external plain
   assert.equal(handleEditorPaste(externalPlainPaste, view), true);
   assert.deepEqual(replacements, [String.raw`\[^ref29]: Footnote source.`]);
   assert.equal(externalPlainPaste.defaultPrevented, true);
+
+  clearRecentInternalMarkdownCopy(dom.window.document);
+  dom.window.close();
+});
+
+test("preserves Obsidian image embeds cut inside the Markdown editor", () => {
+  const dom = new JSDOM("<div class='view'><div class='cm-content'></div></div>");
+  const containerEl = dom.window.document.querySelector(".view");
+  const editorContent = containerEl.querySelector(".cm-content");
+  const cutText = "![[Pasted image 20261008174925.png|362]]";
+  const replacements = [];
+  const editor = {
+    getSelection: () => cutText,
+    replaceSelection: (text) => replacements.push(text),
+    getValue: () => "",
+  };
+  const view = { containerEl, editor };
+
+  assert.equal(handleEditorCut(createEvent(editorContent), view), true);
+
+  const internalRichPaste = createEvent(editorContent, {
+    "text/plain": cutText,
+    "text/html": "<img src='Pasted image 20261008174925.png'>",
+  });
+  assert.equal(handleEditorPaste(internalRichPaste, view), false);
+  assert.equal(handleEditorChange(editor), false);
+  assert.deepEqual(replacements, []);
+  assert.equal(internalRichPaste.defaultPrevented, false);
 
   clearRecentInternalMarkdownCopy(dom.window.document);
   dom.window.close();

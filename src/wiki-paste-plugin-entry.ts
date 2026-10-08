@@ -1,7 +1,7 @@
 // @machine:
-// Loads and migrates settings, tracks Markdown editor copy provenance, and registers paste listeners.
+// Loads and migrates settings, tracks Markdown editor copy/cut provenance, and registers paste listeners.
 // Delegates Markdown and Canvas events to their handlers and persists settings changes.
-import { MarkdownView, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
+import { MarkdownView, Menu, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
 import { handleCanvasMarkdownPaste, handleCanvasPaste } from "./auto-expand-canvas/canvas-auto-expand";
 import {
   clearPendingCanvasMarkdown,
@@ -10,15 +10,18 @@ import {
 } from "./card-copy-to-markdown/card-copy-to-markdown";
 import {
   clearRecentInternalMarkdownCopy,
+  handleEditorCut,
   handleEditorChange,
   handleObsidianCopy,
   handleEditorPaste,
 } from "./escape-markdown-syntax/md-editor-paste-handler";
+import { closePasteOptionsPopup, showPasteOptionsPopup } from "./paste-options/paste-options-popup";
 
 interface WikiPasteSettings {
   escapeMarkdownSyntax: boolean;
   autoExpandCanvasCards: boolean;
   canvasCardCopyToMarkdown: boolean;
+  showPasteOptionsPopup: boolean;
 }
 
 interface StoredWikiPasteSettings extends Partial<WikiPasteSettings> {
@@ -29,6 +32,7 @@ const DEFAULT_SETTINGS: WikiPasteSettings = {
   escapeMarkdownSyntax: true,
   autoExpandCanvasCards: true,
   canvasCardCopyToMarkdown: true,
+  showPasteOptionsPopup: true,
 };
 
 export default class WikiPastePlugin extends Plugin {
@@ -42,6 +46,7 @@ export default class WikiPastePlugin extends Plugin {
         ?? DEFAULT_SETTINGS.escapeMarkdownSyntax,
       autoExpandCanvasCards: savedSettings?.autoExpandCanvasCards ?? DEFAULT_SETTINGS.autoExpandCanvasCards,
       canvasCardCopyToMarkdown: savedSettings?.canvasCardCopyToMarkdown ?? DEFAULT_SETTINGS.canvasCardCopyToMarkdown,
+      showPasteOptionsPopup: savedSettings?.showPasteOptionsPopup ?? DEFAULT_SETTINGS.showPasteOptionsPopup,
     };
     this.addSettingTab(new WikiPasteSettingTab(this.app, this));
 
@@ -59,6 +64,10 @@ export default class WikiPastePlugin extends Plugin {
         handleCanvasCardClipboardEvent(event, document, this.app.workspace.activeLeaf?.view);
       }
     }, { capture: true });
+    this.registerDomEvent(document, "cut", (event: ClipboardEvent) => {
+      const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      handleEditorCut(event, markdownView ?? undefined);
+    });
     this.registerDomEvent(window, "blur", () => {
       clearRecentInternalMarkdownCopy(document);
       clearPendingCanvasMarkdown(document);
@@ -67,6 +76,10 @@ export default class WikiPastePlugin extends Plugin {
     this.registerDomEvent(document, "paste", (event: ClipboardEvent) => {
       const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
       const activeView = this.app.workspace.activeLeaf?.view;
+
+      if (this.settings.showPasteOptionsPopup && markdownView) {
+        this.schedulePasteOptionsPopup(markdownView, event);
+      }
 
       if (this.settings.canvasCardCopyToMarkdown && handleCardMarkdownPaste(event, document, markdownView)) {
         return;
@@ -112,8 +125,26 @@ export default class WikiPastePlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
+  async setPasteOptionsPopupEnabled(enabled: boolean): Promise<void> {
+    this.settings.showPasteOptionsPopup = enabled;
+    if (!enabled) {
+      closePasteOptionsPopup(document);
+    }
+    await this.saveData(this.settings);
+  }
+
+  private schedulePasteOptionsPopup(view: MarkdownView, event: ClipboardEvent): void {
+    const target = event.target as Element | null;
+    if (!target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => showPasteOptionsPopup(view.containerEl, Menu));
+  }
+
   onunload(): void {
     clearPendingCanvasMarkdown(document);
+    closePasteOptionsPopup(document);
   }
 }
 
@@ -149,5 +180,12 @@ class WikiPasteSettingTab extends PluginSettingTab {
       .addToggle((toggle) => toggle
         .setValue(this.plugin.settings.canvasCardCopyToMarkdown)
         .onChange((enabled) => this.plugin.setCanvasCardCopyToMarkdownEnabled(enabled)));
+
+    new Setting(containerEl)
+      .setName("Show paste options popup")
+      .setDesc("Show a Word-style paste options menu after pasting in the Markdown editor. Options are visual only.")
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.showPasteOptionsPopup)
+        .onChange((enabled) => this.plugin.setPasteOptionsPopupEnabled(enabled)));
   }
 }
