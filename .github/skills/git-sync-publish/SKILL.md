@@ -4,6 +4,8 @@ description: 'Git 同步与快速发布工作流。用户要求 git sync、同�
 ---
 warning：修bug前先sync
 
+如果遇到当前账号对repo没有写入权限，try：切换cli这个仓库的own账号
+
 # git sync and publish
 
 ## 工作流原则
