@@ -53,7 +53,21 @@ export function showPasteOptionsPopup(editorContainerEl: HTMLElement, Menu: Menu
       closePasteOptionsPopup(doc);
     }
   };
+  let controlKeyIsDown = false;
+  let controlChordUsed = false;
   const onDocumentKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === "Control") {             //ctrl hack 
+      if (!controlKeyIsDown) {
+        controlKeyIsDown = true;
+        controlChordUsed = false;
+      }
+      return;
+    }
+
+    if (controlKeyIsDown) {
+      controlChordUsed = true;
+    }
+
     if (event.key === "Escape") {
       const menu = activeMenus.get(doc);
       if (menu) {
@@ -63,12 +77,17 @@ export function showPasteOptionsPopup(editorContainerEl: HTMLElement, Menu: Menu
       }
       return;
     }
-
-    if (event.key === "Control") {
-      if (!activeMenus.has(doc)) {
-        openPasteOptionsMenu();
-      }
+  };
+  const onDocumentKeyUp = (event: KeyboardEvent): void => {
+    if (event.key !== "Control" || !controlKeyIsDown) {
       return;
+    }
+
+    const wasControlTap = !controlChordUsed;
+    controlKeyIsDown = false;
+    controlChordUsed = false;
+    if (wasControlTap && !activeMenus.has(doc)) {
+      openPasteOptionsMenu();
     }
   };
   const onDocumentScroll = (): void => {
@@ -81,10 +100,12 @@ export function showPasteOptionsPopup(editorContainerEl: HTMLElement, Menu: Menu
   };
   doc.addEventListener("pointerdown", onDocumentPointerDown);
   doc.addEventListener("keydown", onDocumentKeyDown);
+  doc.addEventListener("keyup", onDocumentKeyUp);
   doc.addEventListener("scroll", onDocumentScroll, true);
   popupCleanups.set(doc, () => {
     doc.removeEventListener("pointerdown", onDocumentPointerDown);
     doc.removeEventListener("keydown", onDocumentKeyDown);
+    doc.removeEventListener("keyup", onDocumentKeyUp);
     doc.removeEventListener("scroll", onDocumentScroll, true);
     const menu = activeMenus.get(doc);
     activeMenus.delete(doc);
