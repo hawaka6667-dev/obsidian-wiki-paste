@@ -1,4 +1,4 @@
-# @machine: Plans and distributes complete plugin packages (manifest.json, main.js, styles.css) to configured A/B vaults, verifies every file hash, optionally changes baseline settings, and reloads enabled copies.
+# @machine: Plans and distributes complete plugin packages (manifest.json, main.js, styles.css) to configured A/B vaults, verifies every file hash, optionally changes baseline settings, and reloads enabled copies. npm run distribute forwards arguments here and defaults to Candidate.
 param(
     [ValidateSet('Candidate', 'Baseline', 'GameDevVault', 'wiki paste', 'Both')]
     [string]$Target = 'Candidate',

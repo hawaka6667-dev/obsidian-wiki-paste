@@ -64,13 +64,23 @@
 	`local-testing/`; verify syntax stays literal in both Markdown editor and
 	Canvas where relevant.
 
-### Auto-expand pasted Canvas cards
+### Auto-expand Canvas cards
 
 - Setting: `autoExpandCanvasCards`, enabled by default and independent of
 	`escapeMarkdownSyntax`.
-- Boundary: after native Canvas paste, resize only newly added or changed text
-	nodes to fit content. Image/file cards and Markdown-editor paste are
-	unaffected; Obsidian retains control of Canvas content conversion.
+- API: `src/auto-expand-canvas/canvas-auto-expand-api.ts` exports
+	`autoExpandCanvasNode(node)`, which expands the supplied connected node by
+	measuring its current content, updating dimensions, and persisting changes.
+	It does not detect paste events or wait for editor readiness; those are
+	interface responsibilities.
+- Interfaces: `canvas-auto-expand.ts` handles native Canvas paste by detecting
+	new or changed text nodes. `canvas-edit-paste-interface.ts` handles paste
+	while the cursor is in a Canvas text card, including a newly-created card;
+	it resolves the node from the event path, focus, or selection and calls the
+	API directly after paste. Unhandled events fall back to the native Canvas
+	paste interface, which retains its rendered-content readiness wait.
+	Image/file cards and Markdown-editor paste are not resize targets, and
+	Obsidian retains control of Canvas content conversion.
 - Automated test: `tests/canvas-auto-expand.test.mjs` covers new/changed versus
 	unchanged nodes, dimension growth, preserving larger dimensions, and clearing
 	then restoring the Markdown preview sizer's minimum height during measurement.
@@ -113,20 +123,28 @@
 	`handleEditorPaste`; otherwise the active view is sent to
 	`handleCanvasMarkdownPaste` (which accepts Canvas views only).
 - After that, when `autoExpandCanvasCards` is enabled, the active view is sent to
-	`handleCanvasPaste` (which accepts Canvas views only).
+	`handleCanvasEditPaste` first. If the event path or current editor focus/
+	selection identifies a text card, that interface resizes the target through
+	the shared API. Otherwise,
+	`handleCanvasPaste` detects changed text nodes and delegates them to the API.
 - In a Markdown editor, plain-text escaping runs in the first handler; rich HTML
-	is post-processed on the subsequent editor-change event. In Canvas, native
-	paste performs insertion; the first scheduled frame escapes changed text-node
-	content, then the second handler's scheduled frame detects those changes and
-	resizes the nodes. This runtime order does not prescribe the A/B test plan.
+	is post-processed on the subsequent editor-change event. In Canvas, Obsidian
+	performs native insertion. The edit-paste interface targets the containing
+	text card and invokes the API after the paste; other Canvas paste events fall
+	back to the added/changed-node snapshot interface. Markdown escaping remains a
+	separate post-process. This runtime order does not prescribe the A/B test plan.
 
 ## Source Map
 
 - `src/wiki-paste-plugin-entry.ts`: plugin lifecycle, setting load/migration,
 	setting UI, shared option state, and capture-phase paste listener.
-- `src/auto-expand-canvas/canvas-auto-expand.ts`: post-processes external Canvas
-	paste text when Markdown escaping is enabled; identifies Canvas resize targets,
-	measures rendered content, and persists expanded dimensions.
+- `src/auto-expand-canvas/canvas-auto-expand-api.ts`: waits for Canvas node
+	content, measures natural dimensions, resizes the supplied node, and persists
+	changes through the reusable `autoExpandCanvasNode` API.
+- `src/auto-expand-canvas/canvas-auto-expand.ts`: handles native Canvas paste
+	text escaping and detects newly added or changed text nodes for auto-expansion.
+- `src/auto-expand-canvas/canvas-edit-paste-interface.ts`: routes paste events
+	from an editable Canvas text card to the shared auto-expand API.
 - `src/card-copy-to-markdown/card-copy-to-markdown.ts`: snapshots selected text
 	cards on native Canvas copy/cut and consumes the Markdown on the next editor
 	paste.
@@ -175,10 +193,10 @@ npm run build
 	previous Release package is missing during initial setup, seed it into
 	`.dist/<version>` once; normal distribution uses local packages only.
 - Every project version change, including version-only changes, requires the
-	complete sequence: `npm run build`, then
-	`pwsh -File .dist/distribute.ps1 -Target Candidate`. Build without
-	distribution is incomplete. An explicitly requested target replaces
-	`Candidate`.
+	complete sequence: `npm run build`, then `npm run distribute`. The npm alias
+	wraps `pwsh -File .dist/distribute.ps1` and defaults to `Candidate`; pass
+	explicit parameters with `npm run distribute -- -Target Baseline`. Build
+	without distribution is incomplete.
 - For A/B delivery, `-Target Baseline` selects `wiki paste`, and `-Target Both`
 	plans both roles. Use `-CandidateVersion` and `-BaselineVersion` to select
 	each local package independently, or `-Version` to override every selected

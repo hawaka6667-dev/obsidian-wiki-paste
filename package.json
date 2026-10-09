@@ -1,8 +1,9 @@
 {
   "name": "wiki-paste",
-  "version": "0.2.10",
+  "version": "0.2.12",
   "scripts": {
     "build": "node .dist/build.mjs",
+    "distribute": "pwsh -File .dist/distribute.ps1",
     "sync": "pwsh -File .dist/sync.ps1",
     "release": "pwsh -File .dist/release.ps1",
     "test": "tsx --test",

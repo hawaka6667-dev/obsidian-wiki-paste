@@ -4,6 +4,7 @@ description: 'Use when a Wiki Paste change needs a local build or distribution, 
 user-invocable: true
 ---
 src改动才触发版本管理
+warning：如果build而不distribute，则会出bug！
 
 # Build and Distribute Quickly
 

@@ -3,6 +3,7 @@
 // Delegates Markdown and Canvas events to their handlers and persists settings changes.
 import { MarkdownView, Menu, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
 import { handleCanvasMarkdownPaste, handleCanvasPaste } from "./auto-expand-canvas/canvas-auto-expand";
+import { handleCanvasEditPaste } from "./auto-expand-canvas/canvas-edit-paste-interface";
 import {
   clearPendingCanvasMarkdown,
   handleCanvasCardClipboardEvent,
@@ -115,7 +116,7 @@ export default class WikiPastePlugin extends Plugin {
       }
 
       if (this.settings.autoExpandCanvasCards) {
-        if (activeView) {
+        if (activeView && !handleCanvasEditPaste(event, activeView)) {
           handleCanvasPaste(event, activeView);
         }
       }
