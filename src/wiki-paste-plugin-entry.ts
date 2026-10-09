@@ -17,9 +17,9 @@ import {
 } from "./escape-markdown-syntax/md-editor-paste-handler";
 import { closePasteOptionsPopup, showPasteOptionsPopup } from "./paste-options/paste-options-popup";
 import {
-  clearPasteToHtmlCopy,
-  pasteAsCleanHtml,
-  rememberPasteToHtmlCopy,
+  clearRecentInternalHtmlCopy,
+  pasteClipboardHtml,
+  rememberInternalHtmlCopy,
 } from "./paste-to-html/paste-to-html";
 
 interface WikiPasteSettings {
@@ -69,7 +69,7 @@ export default class WikiPastePlugin extends Plugin {
     });
     this.registerDomEvent(document, "copy", (event: ClipboardEvent) => {
       const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-      rememberPasteToHtmlCopy(event, markdownView ?? undefined);
+      rememberInternalHtmlCopy(event, markdownView ?? undefined);
     });
     this.registerDomEvent(document, "cut", (event: ClipboardEvent) => {
       if (this.settings.canvasCardCopyToMarkdown) {
@@ -82,11 +82,11 @@ export default class WikiPastePlugin extends Plugin {
     });
     this.registerDomEvent(document, "cut", (event: ClipboardEvent) => {
       const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-      rememberPasteToHtmlCopy(event, markdownView ?? undefined);
+      rememberInternalHtmlCopy(event, markdownView ?? undefined);
     });
     this.registerDomEvent(window, "blur", () => {
       clearRecentInternalMarkdownCopy(document);
-      clearPasteToHtmlCopy(document);
+      clearRecentInternalHtmlCopy(document);
       clearPendingCanvasMarkdown(document);
     });
 
@@ -102,7 +102,7 @@ export default class WikiPastePlugin extends Plugin {
         return;
       }
 
-      if (this.settings.pasteWebContentAsHtml && markdownView && pasteAsCleanHtml(event, markdownView)) {
+      if (this.settings.pasteWebContentAsHtml && markdownView && pasteClipboardHtml(event, markdownView)) {
         return;
       }
 
@@ -154,11 +154,6 @@ export default class WikiPastePlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-  async setPasteWebContentAsHtmlEnabled(enabled: boolean): Promise<void> {
-    this.settings.pasteWebContentAsHtml = enabled;
-    await this.saveData(this.settings);
-  }
-
   private schedulePasteOptionsPopup(view: MarkdownView, event: ClipboardEvent): void {
     const target = event.target as Element | null;
     if (!target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
@@ -169,7 +164,7 @@ export default class WikiPastePlugin extends Plugin {
   }
 
   onunload(): void {
-    clearPasteToHtmlCopy(document);
+    clearRecentInternalHtmlCopy(document);
     clearPendingCanvasMarkdown(document);
     closePasteOptionsPopup(document);
   }
@@ -216,10 +211,14 @@ class WikiPasteSettingTab extends PluginSettingTab {
         .onChange((enabled) => this.plugin.setPasteOptionsPopupEnabled(enabled)));
 
     new Setting(containerEl)
-      .setName("Paste web content as cleaned HTML")
-      .setDesc("Preserve webpage HTML structure while removing scripts, styles, tracking, and page chrome.")
+      .setName("Paste web content as raw HTML")
+      .setDesc("Insert webpage HTML unchanged in the Markdown editor instead of using Obsidian's conversion.")
       .addToggle((toggle) => toggle
         .setValue(this.plugin.settings.pasteWebContentAsHtml)
-        .onChange((enabled) => this.plugin.setPasteWebContentAsHtmlEnabled(enabled)));
+        .onChange(async (enabled) => {
+          this.plugin.settings.pasteWebContentAsHtml = enabled;
+          await this.plugin.saveData(this.plugin.settings);
+        }));
+
   }
 }

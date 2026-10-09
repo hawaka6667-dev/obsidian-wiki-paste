@@ -1,6 +1,6 @@
 {
   "name": "wiki-paste",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "scripts": {
     "build": "node .dist/build.mjs",
     "sync": "pwsh -File .dist/sync.ps1",

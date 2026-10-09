@@ -1,39 +1,36 @@
 // @machine:
-// Handles external rich-HTML paste directly in the Markdown editor.
-// Preserves Obsidian's native paste when the clipboard has no HTML or the target is not an editor.
+// Handles option-enabled webpage HTML paste in the Markdown editor.
+// Preserves internal Obsidian copies and inserts external clipboard HTML unchanged.
+//纯html
 
 import type { MarkdownView } from "obsidian";
-import { cleanHtml } from "./html-cleaner";
 
-const recentInternalMarkdownCopies = new WeakMap<Document, { text: string }>();
+const recentInternalCopies = new WeakMap<Document, { text: string }>();
 
-export function rememberPasteToHtmlCopy(event: ClipboardEvent, view?: MarkdownView): boolean {
+export function rememberInternalHtmlCopy(event: ClipboardEvent, view?: MarkdownView): void {
   const target = event.target as Element | null;
   const document = view?.containerEl.ownerDocument ?? target?.ownerDocument;
   if (!document) {
-    return false;
+    return;
   }
 
-  recentInternalMarkdownCopies.delete(document);
+  recentInternalCopies.delete(document);
   if (!view || !target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
-    return false;
+    return;
   }
 
   const clipboardText = event.clipboardData?.getData("text/plain") ?? "";
   const copiedText = clipboardText || view.editor.getSelection();
-  if (!copiedText) {
-    return false;
+  if (copiedText) {
+    recentInternalCopies.set(document, { text: copiedText });
   }
-
-  recentInternalMarkdownCopies.set(document, { text: copiedText });
-  return true;
 }
 
-export function clearPasteToHtmlCopy(document: Document): void {
-  recentInternalMarkdownCopies.delete(document);
+export function clearRecentInternalHtmlCopy(document: Document): void {
+  recentInternalCopies.delete(document);
 }
 
-export function pasteAsCleanHtml(event: ClipboardEvent, view: MarkdownView): boolean {
+export function pasteClipboardHtml(event: ClipboardEvent, view: MarkdownView): boolean {
   const target = event.target as Element | null;
   if (!target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
     return false;
@@ -41,9 +38,9 @@ export function pasteAsCleanHtml(event: ClipboardEvent, view: MarkdownView): boo
 
   const clipboardData = event.clipboardData;
   const clipboardText = clipboardData?.getData("text/plain");
-  const internalCopy = recentInternalMarkdownCopies.get(view.containerEl.ownerDocument);
+  const internalCopy = recentInternalCopies.get(view.containerEl.ownerDocument);
   if (internalCopy) {
-    recentInternalMarkdownCopies.delete(view.containerEl.ownerDocument);
+    recentInternalCopies.delete(view.containerEl.ownerDocument);
     if (clipboardText === internalCopy.text) {
       return false;
     }
@@ -56,9 +53,7 @@ export function pasteAsCleanHtml(event: ClipboardEvent, view: MarkdownView): boo
 
   event.preventDefault();
   event.stopPropagation();
-  const cleanedHtml = cleanHtml(html, view.containerEl.ownerDocument);
-  if (cleanedHtml) {
-    view.editor.replaceSelection(cleanedHtml);
-  }
+  // const cleanedHtml = cleanHtml(html, view.containerEl.ownerDocument);
+  view.editor.replaceSelection(html);
   return true;
 }
