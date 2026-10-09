@@ -14,16 +14,15 @@ const removedElements = [
   "iframe",
   "object",
   "embed",
-  "form",
-  "button",
   "input",
   "textarea",
   "select",
   "option",
 ];
 
-const pageNoisePattern = /(?:^|[-_\s])(advert(?:isement)?|ads?|sponsor(?:ed)?|cookie|consent|share|social|related|recommend(?:ation)?|newsletter|subscribe|breadcrumb|toolbar|navbar|navigation|sidebar|popup|modal|tracking|analytics|promo(?:tion)?|widget|comments?|paywall|overlay)(?:$|[-_\s])/i;
-const safeUrlPattern = /^(?:https?:|mailto:|tel:|\/|#|\.?\.?\/)/i;
+const pageNoisePattern = /(?:^|[-_\s])(advert(?:isement)?|ads?|sponsor(?:ed)?|cookie|consent|tracking|analytics|paywall)(?:$|[-_\s])/i;
+const defaultInfoPattern = /^(?:no information (?:is )?available for this page\.?|there is no information for this page\.?|没有此网页的信息。?|此网页没有可用信息。?|了解原因|learn why)$/i;
+const unsafeUrlSchemePattern = /^[a-z][a-z\d+.-]*:/i;
 const usefulAttributes = new Set([
   "alt",
   "cite",
@@ -33,9 +32,10 @@ const usefulAttributes = new Set([
   "headers",
   "height",
   "href",
+  "id",
   "lang",
-  " rowspan",
   "rowspan",
+  "role",
   "scope",
   "src",
   "srcset",
@@ -57,7 +57,38 @@ export function cleanHtml(html: string, document: Document): string {
     element.remove();
   }
 
+  const nodeFilter = document.defaultView?.NodeFilter;
+  if (nodeFilter) {
+    const commentWalker = parsed.createTreeWalker(parsed.body, nodeFilter.SHOW_COMMENT);
+    let comment = commentWalker.nextNode();
+    while (comment) {
+      const nextComment = commentWalker.nextNode();
+      comment.parentNode?.removeChild(comment);
+      comment = nextComment;
+    }
+  }
+
   for (const element of Array.from(parsed.body.querySelectorAll("*"))) {
+    const style = element.getAttribute("style") ?? "";
+    if (
+      element.hasAttribute("hidden")
+      || element.hasAttribute("inert")
+      || /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden|content-visibility\s*:\s*hidden)\b/i.test(style)
+    ) {
+      element.remove();
+      continue;
+    }
+
+    const textWalker = parsed.createTreeWalker(element, document.defaultView?.NodeFilter.SHOW_TEXT ?? 4);
+    let textNode = textWalker.nextNode();
+    while (textNode) {
+      const nextTextNode = textWalker.nextNode();
+      if (defaultInfoPattern.test(textNode.textContent?.trim() ?? "")) {
+        textNode.parentNode?.removeChild(textNode);
+      }
+      textNode = nextTextNode;
+    }
+
     const sourceLabel = `${element.id} ${element.getAttribute("class") ?? ""}`;
     if (pageNoisePattern.test(sourceLabel)) {
       element.remove();
@@ -73,8 +104,10 @@ export function cleanHtml(html: string, document: Document): string {
 
     for (const attribute of Array.from(element.attributes)) {
       const name = attribute.name.toLowerCase();
-      if (usefulAttributes.has(name)) {
-        if (urlAttributes.has(name) && !safeUrlPattern.test(attribute.value.trim())) {
+      if (name.startsWith("aria-") || usefulAttributes.has(name)) {
+        if (urlAttributes.has(name) && !isSafeUrl(attribute.value, element, name)) {
+          element.removeAttribute(attribute.name);
+        } else if (name === "srcset" && !isSafeSrcSet(attribute.value)) {
           element.removeAttribute(attribute.name);
         }
         continue;
@@ -84,4 +117,27 @@ export function cleanHtml(html: string, document: Document): string {
   }
 
   return parsed.body.innerHTML.trim();
+}
+
+function isSafeUrl(value: string, element: Element, attributeName: string): boolean {
+  const trimmedValue = value.trim();
+  if (/^(?:https?:|mailto:|tel:)/i.test(trimmedValue)) {
+    return true;
+  }
+
+  if (
+    element.localName === "img"
+    && attributeName === "src"
+    && /^data:image\/(?:gif|jpeg|png|webp|svg\+xml);base64,/i.test(trimmedValue)
+  ) {
+    return true;
+  }
+
+  return !unsafeUrlSchemePattern.test(trimmedValue);
+}
+
+function isSafeSrcSet(value: string): boolean {
+  const unsafeScheme = /(?:^|[\s,])(?!(?:https?|data):)[a-z][a-z\d+.-]*:/i;
+  const unsafeDataUrl = /(?:^|[\s,])data:(?!image\/(?:gif|jpeg|png|webp|svg\+xml);base64,)/i;
+  return !unsafeScheme.test(value) && !unsafeDataUrl.test(value);
 }

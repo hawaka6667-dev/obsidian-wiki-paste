@@ -1,103 +1,64 @@
 // @machine:
-// Captures rich clipboard HTML and can replace the corresponding native editor paste on request.
-// Uses html-cleaner for output and rejects replacement if surrounding editor content changed.
+// Handles external rich-HTML paste directly in the Markdown editor.
+// Preserves Obsidian's native paste when the clipboard has no HTML or the target is not an editor.
 
-import type { Editor, MarkdownView } from "obsidian";
+import type { MarkdownView } from "obsidian";
 import { cleanHtml } from "./html-cleaner";
 
-interface PendingHtmlPaste {
-  document: Document;
-  html: string;
-  originalValue: string;
-  selectionFrom: number;
-  selectionTo: number;
-  insertedFrom?: number;
-  insertedTo?: number;
+const recentInternalMarkdownCopies = new WeakMap<Document, { text: string }>();
+
+export function rememberPasteToHtmlCopy(event: ClipboardEvent, view?: MarkdownView): boolean {
+  const target = event.target as Element | null;
+  const document = view?.containerEl.ownerDocument ?? target?.ownerDocument;
+  if (!document) {
+    return false;
+  }
+
+  recentInternalMarkdownCopies.delete(document);
+  if (!view || !target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
+    return false;
+  }
+
+  const clipboardText = event.clipboardData?.getData("text/plain") ?? "";
+  const copiedText = clipboardText || view.editor.getSelection();
+  if (!copiedText) {
+    return false;
+  }
+
+  recentInternalMarkdownCopies.set(document, { text: copiedText });
+  return true;
 }
 
-const pendingHtmlPastes = new WeakMap<Editor, PendingHtmlPaste>();
+export function clearPasteToHtmlCopy(document: Document): void {
+  recentInternalMarkdownCopies.delete(document);
+}
 
-export function capturePasteToHtml(event: ClipboardEvent, view: MarkdownView): boolean {
+export function pasteAsCleanHtml(event: ClipboardEvent, view: MarkdownView): boolean {
   const target = event.target as Element | null;
   if (!target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
     return false;
   }
 
-  const html = event.clipboardData?.getData("text/html");
+  const clipboardData = event.clipboardData;
+  const clipboardText = clipboardData?.getData("text/plain");
+  const internalCopy = recentInternalMarkdownCopies.get(view.containerEl.ownerDocument);
+  if (internalCopy) {
+    recentInternalMarkdownCopies.delete(view.containerEl.ownerDocument);
+    if (clipboardText === internalCopy.text) {
+      return false;
+    }
+  }
+
+  const html = clipboardData?.getData("text/html");
   if (!html) {
     return false;
   }
 
-  const editor = view.editor;
-  const pendingPaste: PendingHtmlPaste = {
-    document: view.containerEl.ownerDocument,
-    html,
-    originalValue: editor.getValue(),
-    selectionFrom: editor.posToOffset(editor.getCursor("from")),
-    selectionTo: editor.posToOffset(editor.getCursor("to")),
-  };
-  pendingHtmlPastes.set(editor, pendingPaste);
-  setTimeout(() => {
-    if (pendingHtmlPastes.get(editor) === pendingPaste) {
-      pendingHtmlPastes.delete(editor);
-    }
-  }, 30_000);
-  return true;
-}
-
-export function trackPasteToHtmlEditorChange(editor: Editor): boolean {
-  const pendingPaste = pendingHtmlPastes.get(editor);
-  if (!pendingPaste) {
-    return false;
+  event.preventDefault();
+  event.stopPropagation();
+  const cleanedHtml = cleanHtml(html, view.containerEl.ownerDocument);
+  if (cleanedHtml) {
+    view.editor.replaceSelection(cleanedHtml);
   }
-
-  const currentValue = editor.getValue();
-  const insertedTo = editor.posToOffset(editor.getCursor("head"));
-  if (
-    currentValue === pendingPaste.originalValue
-    || insertedTo < pendingPaste.selectionFrom
-    || currentValue.slice(0, pendingPaste.selectionFrom)
-      !== pendingPaste.originalValue.slice(0, pendingPaste.selectionFrom)
-    || currentValue.slice(insertedTo)
-      !== pendingPaste.originalValue.slice(pendingPaste.selectionTo)
-  ) {
-    pendingHtmlPastes.delete(editor);
-    return false;
-  }
-
-  pendingPaste.insertedFrom = pendingPaste.selectionFrom;
-  pendingPaste.insertedTo = insertedTo;
-  return true;
-}
-
-export function pasteToHtml(editor: Editor): boolean {
-  const pendingPaste = pendingHtmlPastes.get(editor);
-  if (pendingPaste?.insertedFrom === undefined || pendingPaste.insertedTo === undefined) {
-    return false;
-  }
-
-  const currentValue = editor.getValue();
-  if (
-    currentValue.slice(0, pendingPaste.insertedFrom)
-      !== pendingPaste.originalValue.slice(0, pendingPaste.selectionFrom)
-    || currentValue.slice(pendingPaste.insertedTo)
-      !== pendingPaste.originalValue.slice(pendingPaste.selectionTo)
-  ) {
-    pendingHtmlPastes.delete(editor);
-    return false;
-  }
-
-  const cleanedHtml = cleanHtml(pendingPaste.html, pendingPaste.document);
-  if (!cleanedHtml) {
-    pendingHtmlPastes.delete(editor);
-    return false;
-  }
-
-  editor.replaceRange(
-    cleanedHtml,
-    editor.offsetToPos(pendingPaste.insertedFrom),
-    editor.offsetToPos(pendingPaste.insertedTo),
-  );
-  pendingHtmlPastes.delete(editor);
   return true;
 }

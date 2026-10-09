@@ -1,5 +1,6 @@
 <#
 @machine: Publishes the existing .dist/<version> Obsidian plugin bundle, manifest, and stylesheet as GitHub release assets, after validating repository, tag, and GitHub CLI state.
+版本是单调递增的，Git标签检查可以skip
 #>
 $ErrorActionPreference = "Stop"
 
