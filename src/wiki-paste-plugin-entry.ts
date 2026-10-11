@@ -2,8 +2,9 @@
 // Loads and migrates settings, tracks Markdown editor copy/cut provenance, and registers paste listeners.
 // Delegates Markdown and Canvas events to their handlers and persists settings changes.
 import { MarkdownView, Menu, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
-import { handleCanvasMarkdownPaste, handleCanvasPaste } from "./auto-expand-canvas/canvas-auto-expand";
-import { handleCanvasEditPaste } from "./auto-expand-canvas/canvas-edit-paste-interface";
+import { handleCanvasPaste } from "./auto-expand-canvas/canvas-paste";
+import { handleCanvasMarkdownPaste } from "./auto-expand-canvas/canvas-markdown-escape";
+import { handleCanvasEditPaste } from "./auto-expand-canvas/canvas-paste-card";
 import {
   clearPendingCanvasMarkdown,
   handleCanvasCardClipboardEvent,
@@ -182,6 +183,13 @@ class WikiPasteSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
+
+    const { manifest } = this.plugin;
+    containerEl.createEl("h2", { text: manifest.name });
+    containerEl.createEl("p", { text: manifest.description });
+    containerEl.createEl("p", {
+      text: `Version ${manifest.version} | Plugin ID: ${manifest.id} | Requires Obsidian ${manifest.minAppVersion}+ | By ${manifest.author}`,
+    });
 
     new Setting(containerEl)
       .setName("Escape pasted Markdown syntax")

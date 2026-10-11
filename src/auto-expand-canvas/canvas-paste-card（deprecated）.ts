@@ -1,13 +1,18 @@
 // @machine:
 // Detects paste into the focused editor of a Canvas text card, including a newly-created card.
 // Resolves the owning node from the event path or current editor selection and delegates sizing to the API.
-import { autoExpandCanvasNode, type CanvasAutoExpandNode } from "./canvas-auto-expand-api";
+//deprecated
+
+import { autoExpandCanvasNode, type CanvasAutoExpandNode } from "./canvas-auto-expand";
 
 interface CanvasView {
   getViewType(): string;
   canvas: { nodes: Map<string, CanvasAutoExpandNode> };
 }
 
+/**
+ * @deprecated Canvas may commit pasted edits after this one-frame expansion trigger has already run.
+ */
 export function handleCanvasEditPaste(event: ClipboardEvent, view: unknown): boolean {
   if (!isCanvasView(view)) {
     return false;

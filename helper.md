@@ -141,8 +141,11 @@
 - `src/auto-expand-canvas/canvas-auto-expand-api.ts`: waits for Canvas node
 	content, measures natural dimensions, resizes the supplied node, and persists
 	changes through the reusable `autoExpandCanvasNode` API.
-- `src/auto-expand-canvas/canvas-auto-expand.ts`: handles native Canvas paste
-	text escaping and detects newly added or changed text nodes for auto-expansion.
+- `src/auto-expand-canvas/canvas-auto-expand.ts`: detects newly added or changed
+	Canvas text nodes after native paste, waits for rendered content, and delegates
+	sizing to the auto-expand API.
+- `src/auto-expand-canvas/canvas-markdown-paste-interface.ts`: post-processes
+	new or changed Canvas text nodes with Markdown escaping after native paste.
 - `src/auto-expand-canvas/canvas-edit-paste-interface.ts`: routes paste events
 	from an editable Canvas text card to the shared auto-expand API.
 - `src/card-copy-to-markdown/card-copy-to-markdown.ts`: snapshots selected text
