@@ -1,245 +1,68 @@
 ---
-技术文档spec 规格说明poc
-为人快速恢复上下文。
-为llm快速恢复上下文，内容级别不得上升为设计契约
+Technical context and module contracts for Wiki Paste.
 ---
 
-# Wiki Paste: Quick Project Context
+# Wiki Paste: Project Context
+
 ## Purpose
 
-目标对象是从网页复制到 Obsidian 的网页内容。转义 case 列表维护在 [md-syntax-escaping.md](md-syntax-escaping.md)；本文件只提供项目入口和快速索引。
+Enhances Obsidian Markdown and Canvas editing/pasting: converts web and AI-chat LaTeX formulas into Obsidian `$...$` / `$$...$$`, auto-expands pasted Canvas cards, supports Canvas card-to-Markdown and card-to-card pasting, provides OneNote-style `Ctrl+A` and `Alt+Up/Down` line movement, and keeps legacy Markdown-escaping / paste-popup / raw-HTML prototypes behind opt-in `[Hack]` toggles.
 
-## Development Workflow
-
-链条没跑通，弄啥测试？？？
-
-- Start from the named file or behavior. Before editing, identify the owning
-	module, one falsifiable local hypothesis, and the cheapest check that could
-	disconfirm it.
-- Keep changes scoped to the requested outcome. Preserve unrelated worktree
-	edits, and do not rename existing Markdown files unless asked.
-- Begin source files with a concise, multi-line `@machine` header describing
-	their inputs, outputs, dependencies, and global effects. Update it when the
-	file's role changes; do not add tests just to verify a header comment.
-- Choose validation by the changed behavior: run the narrowest relevant test or
-	check for routine work. Do not run `npm test` by default; use it when the user
-	asks for the full suite, a release workflow requires it, or the change spans
-	multiple behavior contracts without adequate focused coverage.
-- Complete a self-contained side request without dropping an unfinished primary
-	task, unless the user explicitly pauses or redirects that task.
-
-## Current Behavior
+## Current Settings Contract
 
 - Plugin id: `wiki-paste`; minimum Obsidian version: `1.5.0`.
-- Default settings: `convertLatexOnPaste`, `autoExpandCanvasCards`,
-	`canvasCardCopyToMarkdown`, `selectLineBeforeAll`, and
-	`moveLinesWithAltArrows` are enabled by default; `[Hack]` options
-	(`escapeMarkdownSyntax`, `showPasteOptionsPopup`, `pasteWebContentAsHtml`)
-	default to `false` and persist independently with Obsidian `loadData` / `saveData`.
-	`escapeFootnoteReferences` is a migration fallback for `escapeMarkdownSyntax`.
-- Paste and syntax-escaping behavior is documented in
-	[md-syntax-escaping.md](md-syntax-escaping.md) as input/output cases; do not
-	duplicate the case list in this quick-context file.
+- Enabled by default (`true`):
+  - `convertLatexOnPaste`
+  - `autoExpandCanvasCards`
+  - `canvasCardCopyToMarkdown`
+  - `selectLineBeforeAll`
+  - `moveLinesWithAltArrows`
+- `[Hack]` opt-in toggles (`false` by default):
+  - `escapeMarkdownSyntax` (with `escapeFootnoteReferences` migration fallback)
+  - `showPasteOptionsPopup` (visual-only popup)
+  - `pasteWebContentAsHtml` (inserts raw clipboard HTML verbatim)
 
-## Options and Tests
+## Runtime Dispatch Order
 
-### Escape pasted Markdown syntax
+- **`keydown` (capture phase)** in `src/wiki-paste-plugin-entry.ts`:
+  1. `handleSelectLineThenAllKeydown` (`Ctrl+A` / `Cmd+A` on macOS): selects current logical line on first press; passes through to native Select All on second press, empty lines, multi-line selections, or repeat events.
+  2. `handleMoveSelectedLinesKeydown` (`Alt+ArrowUp` / `Alt+ArrowDown`): swaps the current line or selected block with the adjacent line and shifts selection indices.
+- **`paste` (capture phase)** in `src/wiki-paste-plugin-entry.ts`:
+  1. `schedulePasteOptionsPopup` (when `[Hack] showPasteOptionsPopup` is enabled in `MarkdownView`).
+  2. `handleCardMarkdownPaste` (consumes one-shot Canvas text card snapshot into `MarkdownView` or another Canvas text card editor; optionally triggers `autoExpandCanvasNode`).
+  3. `pasteClipboardHtml` (when `[Hack] pasteWebContentAsHtml` is enabled in `MarkdownView`).
+  4. `handleEditorPaste` (in `MarkdownView`) or `handleCanvasMarkdownPaste` (in `CanvasView`) when `convertLatexOnPaste` or `escapeMarkdownSyntax` is enabled; bypasses internal Obsidian copies via `recentInternalMarkdownCopies`.
+  5. `handleCanvasPaste` (in `CanvasView` when `autoExpandCanvasCards` is enabled): waits for node render readiness and invokes `autoExpandCanvasNode`.
+- **`editor-change`**: `handleEditorChange` post-processes native HTML pastes (`PendingHtmlPaste`) for `\(...\)` / `\[...\]` conversion and optional `escapeObsidianSyntax`.
 
-- Setting: `escapeMarkdownSyntax`, enabled by default.
-- Boundary: applies to external web-to-Obsidian pastes in the Markdown editor
-	or Canvas. It does not modify Obsidian-to-Obsidian copies. Matching internal
-	copies and cuts are bypassed by a one-shot exact-text provenance marker,
-	cleared on window blur; there is no time-based expiry.
-- Plain text uses `escapeMarkdownSyntax`; rich HTML is handled after Obsidian's
-	native conversion with `escapeObsidianSyntax`. Canvas conversion remains
-	native; only newly added or changed text-node content is post-processed.
-- Community-plugin compatibility includes iOS versions before 16.4; syntax
-	scanning must not use JavaScript regular-expression lookbehind. Build output
-	should be checked after changes to `md-syntax-escaping.ts`.
-- Automated tests: `tests/md-syntax-escaping.test.mjs` covers syntax outputs;
-	`tests/md-editor-paste-handler.test.mjs` covers Markdown-editor external vs
-	internal copy/cut paste behavior; `tests/canvas-auto-expand.test.mjs` covers external
-	plain/rich Canvas escaping and internal-copy preservation.
-- Visual test: use the developer-selected external-paste scenario in
-	`local-testing/`; verify syntax stays literal in both Markdown editor and
-	Canvas where relevant.
+## Source & Test Map
 
-### Auto-expand Canvas cards
+- `src/wiki-paste-plugin-entry.ts`: lifecycle, event registration, Canvas leaf lookup (`getLeavesOfType("canvas")`), and delegation.
+- `src/settings.ts`: `WikiPasteSettings`, `DEFAULT_SETTINGS`, `normalizeSettings`, and `WikiPasteSettingTab`.
+- `src/shared/editor-target.ts`: `isCanvasView`, `findCanvasNodeForTarget`, and `resolveActiveCmEditor`.
+- `src/shared/issue-report.ts`: builds pre-filled GitHub Issue URLs (`buildIssueUrl`, `openIssueReport`) for Settings & Command Palette (`wiki-paste:submit-issue`).
+- `src/latex-paste/latex-paste.ts` & `src/latex-paste/mathml-to-latex.ts`: web math DOM extraction (KaTeX, Wikipedia `.mwe-math-element`, MathJax v2/v3 + MathML fallback, Zhihu/Gemini/Notion `data-*`, `<math-renderer>`), `\(...\)`/`\[...\]` delimiter conversion, and `$...$`/`$$...$$` span protection.
+- `src/auto-expand-canvas/canvas-auto-expand.ts`: `autoExpandCanvasNode` and `getExpandedCanvasSize` using `styles.css` measurement classes.
+- `src/auto-expand-canvas/canvas-paste.ts`: detects new/changed Canvas text cards on paste and waits for mount before sizing.
+- `src/auto-expand-canvas/canvas-markdown-escape.ts`: post-processes pasted Canvas text cards for LaTeX conversion and optional escaping.
+- `src/card-copy-to-markdown/card-copy-to-markdown.ts`: snapshots sole selected Canvas text card on copy/cut for MIME-free paste into Markdown or another Canvas card.
+- `src/editor-actions/select-line-then-all.ts` & `src/editor-actions/move-selected-lines.ts`: `Ctrl+A` and `Alt+Up/Down` editor actions.
+- `src/escape-markdown-syntax/`: `md-editor-paste-handler.ts`, `md-syntax-escaping.ts`, `md-escape-optimization.ts` (lookbehind-free escaping).
+- `src/paste-options/`: `[Hack]` inert Word-style popup (`paste-options-popup.ts`, `paste-options-menu.ts`, `paste-options-positioning.ts`).
+- `src/paste-to-html/paste-to-html.ts`: `[Hack]` raw clipboard HTML paste.
+- `tests/`: `canvas-auto-expand.test.mjs`, `card-copy-to-markdown.test.mjs`, `latex-paste.test.mjs`, `md-editor-paste-handler.test.mjs`, `md-syntax-escaping.test.mjs`, `move-selected-lines.test.mjs`, `select-line-then-all.test.mjs`, `escape-cases.json`.
+- `docs/legacy/`: archived historical notes and reference fixtures (`table.md`, `md-syntax-escaping.md`, `design doc.md`, `test.md`).
 
-- Setting: `autoExpandCanvasCards`, enabled by default and independent of
-	`escapeMarkdownSyntax`.
-- API: `src/auto-expand-canvas/canvas-auto-expand-api.ts` exports
-	`autoExpandCanvasNode(node)`, which expands the supplied connected node by
-	measuring its current content, updating dimensions, and persisting changes.
-	It does not detect paste events or wait for editor readiness; those are
-	interface responsibilities.
-- Interfaces: `canvas-auto-expand.ts` handles native Canvas paste by detecting
-	new or changed text nodes. `canvas-edit-paste-interface.ts` handles paste
-	while the cursor is in a Canvas text card, including a newly-created card;
-	it resolves the node from the event path, focus, or selection and calls the
-	API directly after paste. Unhandled events fall back to the native Canvas
-	paste interface, which retains its rendered-content readiness wait.
-	Image/file cards and Markdown-editor paste are not resize targets, and
-	Obsidian retains control of Canvas content conversion.
-- Automated test: `tests/canvas-auto-expand.test.mjs` covers new/changed versus
-	unchanged nodes, dimension growth, preserving larger dimensions, and clearing
-	then restoring the Markdown preview sizer's minimum height during measurement.
-- Visual test: use a Canvas fixture in `local-testing/`; compare the rendered
-	content and card bounds for the developer-selected scenario.
-
-### Paste Canvas text cards to Markdown / Canvas card
-
-- Setting: `canvasCardCopyToMarkdown`, enabled by default and independent of
-	`escapeMarkdownSyntax` and `autoExpandCanvasCards`.
-- Boundary: on native Canvas `copy` or `cut`, snapshot the sole selected text
-	node's `getData().text` without preventing the native clipboard or cut action.
-	The next paste into a Markdown editor or another Canvas text card's editor
-	(`.cm-content`) consumes that one-shot Markdown value, without requiring native
-	clipboard MIME data; multi-selection, non-text cards, and non-editor Canvas
-	background pastes are left to Obsidian.
-- Confirmed user scenario: copy or cut one text card, switch to a Markdown
-	editor, and paste; verify exact Markdown insertion and unchanged native copy/
-	cut behavior. Automated coverage includes copy/cut snapshots, MIME-free paste,
-	one-shot consumption, and clearing on non-editor paste; run
-	`npx tsx --test tests/card-copy-to-markdown.test.mjs`.
-
-### Show paste options popup
-
-- Setting: `showPasteOptionsPopup`, enabled by default and persisted independently.
-- Boundary: after paste events originating inside the Markdown editor, show a
-	visual popup with three inert options. Ctrl opens the menu; Up/Down move
-	focus through the options and Enter dismisses the selected option. Selection
-	does not change editor content, clipboard data, or paste formatting. Popup
-	positioning is not yet recorded as a verified behavior.
-
-### Convert and preserve pasted LaTeX
-
-- Setting: `convertLatexOnPaste`, enabled by default and independent of
-	`escapeMarkdownSyntax` and `pasteWebContentAsHtml`.
-- Boundary: applies to external webpage and AI-chat pastes in both Markdown editor
-	and Canvas (unless `pasteWebContentAsHtml` intercepts raw HTML first); matching
-	internal Obsidian copies/cuts are bypassed.
-- Extracts rendered web math DOM nodes (KaTeX, Wikipedia `.mwe-math-element`,
-	MathJax v2/v3 including pure MathML fallback, Zhihu/Gemini `data-*` attributes,
-	`<math-renderer>`, standalone `<math>`) via `htmlToMarkdown` with opaque
-	placeholders, and converts plain-text `\(...\)` / `\[...\]` outside code blocks
-	and inline code to Obsidian `$...$` / `$$...$$`.
-- When `escapeMarkdownSyntax` is also enabled, `$...$` and `$$...$$` math spans
-	are protected so LaTeX syntax is not escaped.
-
-## Global Paste Execution Order
-
-- `src/wiki-paste-plugin-entry.ts` registers one document capture-phase paste
-	listener. It resolves the active `MarkdownView` and active leaf view first.
-- On paste, `handleCardMarkdownPaste` gets first refusal when a Canvas card
-	Markdown snapshot is pending; a successful insertion stops this plugin's
-	later paste handlers. Without pending card Markdown, normal escaping and
-	Canvas auto-expand handling proceed unchanged.
-- When `escapeMarkdownSyntax` is enabled, an active Markdown view is sent to
-	`handleEditorPaste`; otherwise the active view is sent to
-	`handleCanvasMarkdownPaste` (which accepts Canvas views only).
-- After that, when `autoExpandCanvasCards` is enabled, the active view is sent to
-	`handleCanvasEditPaste` first. If the event path or current editor focus/
-	selection identifies a text card, that interface resizes the target through
-	the shared API. Otherwise,
-	`handleCanvasPaste` detects changed text nodes and delegates them to the API.
-- In a Markdown editor, plain-text escaping runs in the first handler; rich HTML
-	is post-processed on the subsequent editor-change event. In Canvas, Obsidian
-	performs native insertion. The edit-paste interface targets the containing
-	text card and invokes the API after the paste; other Canvas paste events fall
-	back to the added/changed-node snapshot interface. Markdown escaping remains a
-	separate post-process. This runtime order does not prescribe the A/B test plan.
-
-## Source Map
-
-- `src/wiki-paste-plugin-entry.ts`: plugin lifecycle, setting load/migration,
-	setting UI, shared option state, and capture-phase paste listener.
-- `src/auto-expand-canvas/canvas-auto-expand-api.ts`: waits for Canvas node
-	content, measures natural dimensions, resizes the supplied node, and persists
-	changes through the reusable `autoExpandCanvasNode` API.
-- `src/auto-expand-canvas/canvas-auto-expand.ts`: detects newly added or changed
-	Canvas text nodes after native paste, waits for rendered content, and delegates
-	sizing to the auto-expand API.
-- `src/auto-expand-canvas/canvas-markdown-paste-interface.ts`: post-processes
-	new or changed Canvas text nodes with Markdown escaping after native paste.
-- `src/auto-expand-canvas/canvas-edit-paste-interface.ts`: routes paste events
-	from an editable Canvas text card to the shared auto-expand API.
-- `src/card-copy-to-markdown/card-copy-to-markdown.ts`: snapshots selected text
-	cards on native Canvas copy/cut and consumes the Markdown on the next editor
-	paste.
-- `src/move-selected-lines/move-selected-lines.ts`: `Alt+ArrowUp` /
-	`Alt+ArrowDown` line and selection swapping for Markdown and Canvas card editors.
-- `src/select-line-then-all/select-line-then-all.ts`: OneNote-style progressive
-	`Ctrl+A` (first press selects current line; second press falls through to native
-	Select All) for Markdown and Canvas card editors.
-- `src/latex-paste/latex-paste.ts` and `src/latex-paste/mathml-to-latex.ts`:
-	web/AI math DOM extraction, MathML-to-LaTeX fallback, `\(...\)`/`\[...\]`
-	delimiter conversion, and `$...$`/`$$...$$` span protection.
-- `src/escape-markdown-syntax/md-editor-paste-handler.ts`: editor-target guard, rich-HTML
-	paste snapshot, Obsidian copy/cut provenance, post-conversion change handling,
-	plain-text transformation, and selection replacement.
-- `src/paste-options/paste-options-popup.ts`: renders, positions, and handles
-	keyboard interaction for the inert post-paste options popup; menu choices
-	do not modify editor or clipboard data.
-- `md-syntax-escaping.md`: curated syntax-escaping input/output cases.
-- `src/escape-markdown-syntax/md-syntax-escaping.ts` and
-  `src/escape-markdown-syntax/md-escape-optimization.ts`: syntax
-	scanning and escape rendering implementation; expected outputs are listed in
-	the dedicated case document.
-- `tests/md-syntax-escaping.test.ts`: focused regression coverage for escaping.
-- `tests/md-syntax-escaping.test.mjs`: focused regression coverage for escaping.
-- `tests/canvas-auto-expand.test.mjs`: Canvas paste node-selection and sizing
-	regression coverage, including external Markdown escaping and internal-copy
-	preservation.
-- `tests/escape-cases.json` and `table.md`: user-maintained behavior references;
-	preserve their contents unless a request specifically requires editing them.
-- `manifest.json`: root Obsidian metadata. Its version must match `package.json`
-	and both version entries in `package-lock.json`.
-- `.dist/build.mjs`: bundles `src/wiki-paste-plugin-entry.ts` with `obsidian`
-	external into `.dist/<version>/main.js` and copies the manifest and
-	`styles.css`.
-- `.dist/<version>/`: generated installable bundle and manifest; do not edit the
-	generated bundle directly.
-- `styles.css`: plugin-owned classes used for temporary Canvas measurement
-	styles; keep measurement behavior here instead of assigning `element.style`
-	directly.
-- `README.md`: end-user documentation. Keep its marketplace-style format; put
-	developer workflow notes in this file instead.
-
-## Validation and Delivery
+## Validation & Delivery
 
 ```sh
 npm test
 npm run typecheck
 npm run build
+npm run distribute
 ```
 
-- `npm test` runs the current `tsx --test` suite. Use the owning module's
-	narrowest relevant check for routine work.
-- `.dist/build.mjs` keeps the two highest numeric version directories. If a
-	previous Release package is missing during initial setup, seed it into
-	`.dist/<version>` once; normal distribution uses local packages only.
-- Every project version change, including version-only changes, requires the
-	complete sequence: `npm run build`, then `npm run distribute`. The npm alias
-	wraps `pwsh -File .dist/distribute.ps1` and defaults to `Candidate`; pass
-	explicit parameters with `npm run distribute -- -Target Baseline`. Build
-	without distribution is incomplete.
-- For A/B delivery, `-Target Baseline` selects `wiki paste`, and `-Target Both`
-	plans both roles. Use `-CandidateVersion` and `-BaselineVersion` to select
-	each local package independently, or `-Version` to override every selected
-	target. Baseline feature settings are preserved; they are disabled only when
-	`-DisableBaselineOptions` is explicit. Use `-PlanOnly` to inspect package
-	selection without touching vaults. The script verifies bundle hashes and
-	reloads only enabled plugin copies; it does not enable a disabled plugin.
-- `.dist/reload.ps1` validates the installed manifest and requested version
-	before reloading; the distribution script passes the expected version for
-	each vault.
-- For GitHub publishing, run `npm run sync` followed by `npm run release`.
-	The release script uses the existing `.dist/<version>/main.js` and
-	`manifest.json`; it does not build, run tests, or generate a ZIP.
-- Keep the Obsidian plugin id and generated output name (`main.js`) unchanged.
-	When renaming a source entry, update `.dist/build.mjs` and its machine summary.
-- Source filename initialization applies to `src/`; do not rename existing
-	Markdown files unless the user explicitly asks.
-- `table.md` is a user-provided behavior reference. Preserve its filename and
-	content unless a request specifically requires editing it.
+- `manifest.json`, `package.json`, and both entries in `package-lock.json` must share the exact same version before `npm run build` / `npm run distribute` / `npm run release`.
+- `.dist/build.mjs` bundles `src/wiki-paste-plugin-entry.ts` with `obsidian` external into `.dist/<version>/main.js` and keeps the two newest version folders.
+- `.dist/distribute.ps1` deploys to `MainVaultPath` in `.publish-config.json` (`E:\GameDevVault`), verifies SHA-256 hashes, and hot-reloads via Obsidian CLI.
+- Keep `styles.css` measurement classes instead of inline `element.style.*` assignments, and follow Obsidian Community Plugin review rules listed in `AGENTS.md`.

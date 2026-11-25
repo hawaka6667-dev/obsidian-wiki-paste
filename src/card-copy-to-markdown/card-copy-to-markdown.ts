@@ -1,38 +1,14 @@
 // @machine:
 // Snapshots one selected Canvas text card on copy/cut and consumes its Markdown on the next editor or Canvas-card paste.
-import type { Editor, MarkdownView } from "obsidian";
-import type { CanvasAutoExpandNode } from "../auto-expand-canvas/canvas-auto-expand";
 
-interface CanvasNodeData {
-  type: string;
-  text?: string;
-}
-
-interface TextInsertionTarget {
-  replaceSelection: (text: string) => void;
-}
-
-export interface CanvasNode extends Omit<Partial<CanvasAutoExpandNode>, "getData"> {
-  getData?: () => CanvasNodeData;
-  child?: {
-    editor?: TextInsertionTarget & Partial<Editor>;
-  };
-}
-
-interface CanvasView {
-  getViewType: () => string;
-  containerEl: HTMLElement;
-  canvas?: {
-    selection?: Iterable<CanvasNode>;
-    nodes?: Map<string, CanvasNode>;
-  };
-}
+import type { MarkdownView } from "obsidian";
+import { findCanvasNodeForTarget, isCanvasView, type CanvasNodeLike } from "../shared/editor-target";
 
 const pendingCanvasMarkdown = new WeakMap<Document, string>();
 
 export function handleCanvasCardClipboardEvent(event: ClipboardEvent, document: Document, view: unknown): boolean {
   pendingCanvasMarkdown.delete(document);
-  if (event.defaultPrevented || !isCanvasView(view)) {
+  if (event.defaultPrevented || !isCanvasView(view) || !view.containerEl) {
     return false;
   }
 
@@ -41,12 +17,7 @@ export function handleCanvasCardClipboardEvent(event: ClipboardEvent, document: 
     return false;
   }
 
-  const canvas = view.canvas;
-  if (!canvas) {
-    return false;
-  }
-
-  const selection = canvas.selection;
+  const selection = view.canvas.selection;
   if (!selection || typeof selection[Symbol.iterator] !== "function") {
     return false;
   }
@@ -56,8 +27,7 @@ export function handleCanvasCardClipboardEvent(event: ClipboardEvent, document: 
     return false;
   }
 
-  const selectedNode = selectedNodes[0];
-  const data = selectedNode?.getData?.();
+  const data = selectedNodes[0]?.getData?.();
   if (data?.type !== "text" || typeof data.text !== "string" || data.text.length === 0) {
     return false;
   }
@@ -75,7 +45,7 @@ export function handleCardMarkdownPaste(
   document: Document,
   view: MarkdownView | null,
   activeView?: unknown,
-  onCanvasCardPasted?: (node: CanvasNode) => void,
+  onCanvasCardPasted?: (node: CanvasNodeLike) => void,
 ): boolean {
   const markdown = pendingCanvasMarkdown.get(document);
   if (markdown === undefined) {
@@ -103,7 +73,7 @@ function resolvePasteTarget(
   target: Element | null,
   markdownView: MarkdownView | null,
   activeView: unknown,
-): { insert: (text: string) => void; canvasNode?: CanvasNode } | null {
+): { insert: (text: string) => void; canvasNode?: CanvasNodeLike } | null {
   if (!target?.closest?.(".cm-content")) {
     return null;
   }
@@ -112,7 +82,7 @@ function resolvePasteTarget(
     return { insert: (text) => markdownView.editor.replaceSelection(text) };
   }
 
-  if (!isCanvasView(activeView)) {
+  if (!isCanvasView(activeView) || !activeView.containerEl) {
     return null;
   }
 
@@ -140,55 +110,4 @@ function resolvePasteTarget(
   }
 
   return null;
-}
-
-export function resolveActiveCmEditor(
-  target: Element | null,
-  markdownView: MarkdownView | null,
-  activeView?: unknown,
-): Partial<Editor> | null {
-  if (!target?.closest?.(".cm-content")) {
-    return null;
-  }
-
-  if (markdownView && markdownView.containerEl.contains(target)) {
-    return markdownView.editor;
-  }
-
-  return findCanvasNodeForTarget(activeView, target)?.child?.editor ?? null;
-}
-
-export function findCanvasNodeForTarget(view: unknown, target: Element): CanvasNode | undefined {
-  if (!isCanvasView(view)) {
-    return undefined;
-  }
-
-  const nodes = view.canvas?.nodes;
-  const candidates: CanvasNode[] = [];
-  if (nodes instanceof Map) {
-    candidates.push(...nodes.values());
-  } else if (view.canvas?.selection && typeof view.canvas.selection[Symbol.iterator] === "function") {
-    candidates.push(...view.canvas.selection);
-  }
-
-  return candidates.find((node) => {
-    if (!node.nodeEl) {
-      return false;
-    }
-    if (node.nodeEl.contains(target)) {
-      return true;
-    }
-    const iframe = node.nodeEl.querySelector<HTMLIFrameElement>("iframe.embed-iframe");
-    return Boolean(iframe?.contentDocument?.contains(target));
-  });
-}
-
-function isCanvasView(view: unknown): view is CanvasView {
-  if (!view || typeof view !== "object") {
-    return false;
-  }
-
-  const candidate = view as CanvasView;
-  return candidate.getViewType?.() === "canvas"
-    && Boolean(candidate.containerEl && candidate.canvas);
 }

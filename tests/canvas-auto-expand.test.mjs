@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { JSDOM } from "jsdom";
-import { getExpandedCanvasSize, handleCanvasMarkdownPaste, handleCanvasPaste } from "../src/auto-expand-canvas/canvas-auto-expand.ts";
+import { getExpandedCanvasSize, handleCanvasPaste } from "../src/auto-expand-canvas/canvas-paste.ts";
+import { handleCanvasMarkdownPaste } from "../src/auto-expand-canvas/canvas-markdown-escape.ts";
 import { clearRecentInternalMarkdownCopy, handleObsidianCopy } from "../src/escape-markdown-syntax/md-editor-paste-handler.ts";
 
 function createNode(data, document) {

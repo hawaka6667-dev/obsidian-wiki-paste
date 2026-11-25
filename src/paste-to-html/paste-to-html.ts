@@ -1,7 +1,6 @@
 // @machine:
-// Handles option-enabled webpage HTML paste in the Markdown editor.
+// [Hack] Handles option-enabled raw webpage HTML paste in the Markdown editor.
 // Preserves internal Obsidian copies and inserts external clipboard HTML unchanged.
-//纯html
 
 import type { MarkdownView } from "obsidian";
 
@@ -53,7 +52,6 @@ export function pasteClipboardHtml(event: ClipboardEvent, view: MarkdownView): b
 
   event.preventDefault();
   event.stopPropagation();
-  // const cleanedHtml = cleanHtml(html, view.containerEl.ownerDocument);
   view.editor.replaceSelection(html);
   return true;
 }

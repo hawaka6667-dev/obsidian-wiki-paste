@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { JSDOM } from "jsdom";
-import { handleSelectLineThenAllKeydown } from "../src/select-line-then-all/select-line-then-all.ts";
+import { handleSelectLineThenAllKeydown } from "../src/editor-actions/select-line-then-all.ts";
 
 function createKeydownEvent(target, overrides = {}) {
   let defaultPrevented = false;

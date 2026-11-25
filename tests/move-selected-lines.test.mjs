@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { JSDOM } from "jsdom";
-import { handleMoveSelectedLinesKeydown } from "../src/move-selected-lines/move-selected-lines.ts";
+import { handleMoveSelectedLinesKeydown } from "../src/editor-actions/move-selected-lines.ts";
 
 function createKeydownEvent(target, key, overrides = {}) {
   let defaultPrevented = false;

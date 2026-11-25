@@ -1,11 +1,11 @@
 ---
 name: test
-description: 'Use when creating, changing, or reviewing automated tests in Wiki Paste. Mandatory gate: the complete user-facing feature chain must run successfully in Obsidian before writing tests.'
+description: 'Use when running, adding, or updating automated tests or Obsidian visual verification in Wiki Paste.'
 user-invocable: true
 ---
 
-# 测试契约
+# Wiki Paste Testing
 
-## 强制门槛
-
-链条没跑通不准写测试
+1. Run unit tests with `npm test` (runs all `tests/*.test.mjs` via `tsx --test`) and static type checking with `npm run typecheck`.
+2. For targeted edits during iteration, run the owning test file directly, e.g. `npx tsx --test tests/<module>.test.mjs`, then run full `npm test` before delivery.
+3. For runtime UI, Canvas sizing, or live paste/rendering changes, build and distribute (`npm run build && npm run distribute`) and verify in the Candidate Obsidian vault (`E:\GameDevVault`).

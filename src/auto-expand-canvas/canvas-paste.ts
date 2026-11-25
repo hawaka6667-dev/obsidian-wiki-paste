@@ -1,6 +1,7 @@
 // @machine:
 // Detects text cards changed by native Canvas paste and expands them to fit rendered content.
 // Delegates sizing to the reusable API while leaving Obsidian's paste conversion intact.
+import { isCanvasView } from "../shared/editor-target";
 import { autoExpandCanvasNode, type CanvasAutoExpandNode } from "./canvas-auto-expand";
 
 export { handleCanvasMarkdownPaste } from "./canvas-markdown-escape";
@@ -9,13 +10,8 @@ export { getExpandedCanvasSize } from "./canvas-auto-expand";
 const NODE_CONTENT_READY_TIMEOUT_MS = 1000;
 const NODE_CONTENT_READY_POLL_MS = 10;
 
-interface CanvasView {
-  getViewType(): string;
-  canvas: { nodes: Map<string, CanvasAutoExpandNode> };
-}
-
 export function handleCanvasPaste(event: ClipboardEvent, view: unknown): boolean {
-  if (!isCanvasView(view)) {
+  if (!isCanvasView(view) || !(view.canvas.nodes instanceof Map)) {
     return false;
   }
 
@@ -26,32 +22,26 @@ export function handleCanvasPaste(event: ClipboardEvent, view: unknown): boolean
 
   const beforePaste = new Map<string, string | undefined>();
   for (const node of view.canvas.nodes.values()) {
-    const data = node.getData();
-    if (data.type === "text") {
-      beforePaste.set(data.id, data.text);
+    const data = node.getData?.();
+    if (data?.type === "text" && "id" in data) {
+      beforePaste.set((data as { id: string }).id, data.text);
     }
   }
 
   window.requestAnimationFrame(() => {
+    if (!(view.canvas.nodes instanceof Map)) {
+      return;
+    }
     for (const node of view.canvas.nodes.values()) {
-      const data = node.getData();
-      if (data.type !== "text" || beforePaste.get(data.id) === data.text) {
+      const data = node.getData?.() as { id?: string; type?: string; text?: string } | undefined;
+      if (data?.type !== "text" || !data.id || beforePaste.get(data.id) === data.text) {
         continue;
       }
-      void expandCanvasNodeWhenReady(node);
+      void expandCanvasNodeWhenReady(node as CanvasAutoExpandNode);
     }
   });
 
   return true;
-}
-
-function isCanvasView(view: unknown): view is CanvasView {
-  if (!view || typeof view !== "object") {
-    return false;
-  }
-
-  const candidate = view as Partial<CanvasView>;
-  return candidate.getViewType?.() === "canvas" && candidate.canvas?.nodes instanceof Map;
 }
 
 async function expandCanvasNodeWhenReady(node: CanvasAutoExpandNode): Promise<void> {

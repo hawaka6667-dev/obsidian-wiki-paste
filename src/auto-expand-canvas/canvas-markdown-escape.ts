@@ -7,13 +7,7 @@ import {
 } from "../escape-markdown-syntax/md-editor-paste-handler";
 import { escapeMarkdownSyntax, escapeObsidianSyntax } from "../escape-markdown-syntax/md-syntax-escaping";
 import { convertLatexDelimiters, convertWebHtmlWithLatex } from "../latex-paste/latex-paste";
-import type { CanvasAutoExpandNode } from "./canvas-auto-expand";
-
-interface CanvasView {
-  getViewType(): string;
-  containerEl?: HTMLElement;
-  canvas: { nodes: Map<string, CanvasAutoExpandNode> };
-}
+import { isCanvasView } from "../shared/editor-target";
 
 function replaceInsertedTextDiff(beforeText: string, afterText: string, replacement: string): string {
   let prefixLength = 0;
@@ -41,7 +35,7 @@ export function handleCanvasMarkdownPaste(
   view: unknown,
   options: EditorPasteOptions = {},
 ): boolean {
-  if (!isCanvasView(view)) {
+  if (!isCanvasView(view) || !(view.canvas.nodes instanceof Map)) {
     return false;
   }
 
@@ -66,19 +60,22 @@ export function handleCanvasMarkdownPaste(
 
   const beforePaste = new Map<string, string | undefined>();
   for (const node of view.canvas.nodes.values()) {
-    const data = node.getData();
-    if (data.type === "text") {
+    const data = node.getData?.() as { id?: string; type?: string; text?: string } | undefined;
+    if (data?.type === "text" && data.id) {
       beforePaste.set(data.id, data.text);
     }
   }
 
   window.requestAnimationFrame(() => {
-    if (isInternalCopy) {
+    if (isInternalCopy || !(view.canvas.nodes instanceof Map)) {
       return;
     }
 
     for (const node of view.canvas.nodes.values()) {
-      const data = node.getData();
+      const data = node.getData?.() as { id?: string; type?: string; text?: string } | undefined;
+      if (!data?.id) {
+        continue;
+      }
       const previousText = beforePaste.get(data.id);
       if (data.type !== "text" || previousText === data.text || typeof data.text !== "string") {
         continue;
@@ -98,19 +95,10 @@ export function handleCanvasMarkdownPaste(
       }
 
       if (nextText !== data.text) {
-        node.setData({ text: nextText });
+        node.setData?.({ text: nextText });
       }
     }
   });
 
   return true;
-}
-
-function isCanvasView(view: unknown): view is CanvasView {
-  if (!view || typeof view !== "object") {
-    return false;
-  }
-
-  const candidate = view as Partial<CanvasView>;
-  return candidate.getViewType?.() === "canvas" && candidate.canvas?.nodes instanceof Map;
 }
