@@ -31,10 +31,13 @@ import {
   type StoredWikiPasteSettings,
   type WikiPasteSettings,
 } from "./settings";
+import { containerContainsTarget } from "./shared/editor-target";
 import { openIssueReport } from "./shared/issue-report";
 
 export default class WikiPastePlugin extends Plugin {
   settings!: WikiPasteSettings;
+  private readonly observedDocuments = new WeakSet<Document>();
+  private iframeObserver: MutationObserver | null = null;
 
   async onload(): Promise<void> {
     const savedSettings = await this.loadData() as StoredWikiPasteSettings | null;
@@ -47,29 +50,8 @@ export default class WikiPastePlugin extends Plugin {
       callback: () => this.openIssueReportPage(),
     });
 
-    this.registerDomEvent(document, "copy", (event: ClipboardEvent) => {
-      if (this.settings.canvasCardCopyToMarkdown) {
-        handleCanvasCardClipboardEvent(event, document, this.getCanvasView(event));
-      }
-    }, { capture: true });
-
-    this.registerDomEvent(document, "copy", (event: ClipboardEvent) => {
-      const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-      handleObsidianCopy(event, document, markdownView ?? undefined);
-      rememberInternalHtmlCopy(event, markdownView ?? undefined);
-    });
-
-    this.registerDomEvent(document, "cut", (event: ClipboardEvent) => {
-      if (this.settings.canvasCardCopyToMarkdown) {
-        handleCanvasCardClipboardEvent(event, document, this.getCanvasView(event));
-      }
-    }, { capture: true });
-
-    this.registerDomEvent(document, "cut", (event: ClipboardEvent) => {
-      const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-      handleEditorCut(event, markdownView ?? undefined);
-      rememberInternalHtmlCopy(event, markdownView ?? undefined);
-    });
+    this.attachDocumentListeners(document);
+    this.observeCanvasIframes();
 
     this.registerDomEvent(window, "blur", () => {
       clearRecentInternalMarkdownCopy(document);
@@ -77,27 +59,68 @@ export default class WikiPastePlugin extends Plugin {
       clearPendingCanvasMarkdown(document);
     });
 
-    this.registerDomEvent(document, "keydown", (event: KeyboardEvent) => {
+    this.registerEvent(this.app.workspace.on("editor-change", (editor) => {
+      if (this.settings.escapeMarkdownSyntax || this.settings.convertLatexOnPaste) {
+        handleEditorChange(editor);
+      }
+    }));
+  }
+
+  private attachDocumentListeners(targetDoc: Document): void {
+    if (this.observedDocuments.has(targetDoc)) {
+      return;
+    }
+    this.observedDocuments.add(targetDoc);
+
+    this.registerDomEvent(targetDoc, "copy", (event: ClipboardEvent) => {
+      if (this.settings.canvasCardCopyToMarkdown) {
+        handleCanvasCardClipboardEvent(event, document, this.getCanvasView(event));
+      }
+    }, { capture: true });
+
+    this.registerDomEvent(targetDoc, "copy", (event: ClipboardEvent) => {
+      const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      handleObsidianCopy(event, document, markdownView ?? undefined);
+      rememberInternalHtmlCopy(event, markdownView ?? undefined);
+    });
+
+    this.registerDomEvent(targetDoc, "cut", (event: ClipboardEvent) => {
+      if (this.settings.canvasCardCopyToMarkdown) {
+        handleCanvasCardClipboardEvent(event, document, this.getCanvasView(event));
+      }
+    }, { capture: true });
+
+    this.registerDomEvent(targetDoc, "cut", (event: ClipboardEvent) => {
+      const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      handleEditorCut(event, markdownView ?? undefined);
+      rememberInternalHtmlCopy(event, markdownView ?? undefined);
+    });
+
+    this.registerDomEvent(targetDoc, "keydown", (event: KeyboardEvent) => {
       if (!this.settings.selectLineBeforeAll && !this.settings.moveLinesWithAltArrows) {
         return;
       }
 
       const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
       const activeView = markdownView ? undefined : this.getCanvasView(event);
+      const fallbackEditor = this.app.workspace.activeEditor?.editor ?? null;
 
       if (
         this.settings.selectLineBeforeAll
-        && handleSelectLineThenAllKeydown(event, markdownView, activeView, { isMacOS: Platform.isMacOS })
+        && handleSelectLineThenAllKeydown(event, markdownView, activeView, {
+          isMacOS: Platform.isMacOS,
+          fallbackEditor,
+        })
       ) {
         return;
       }
 
       if (this.settings.moveLinesWithAltArrows) {
-        handleMoveSelectedLinesKeydown(event, markdownView, activeView);
+        handleMoveSelectedLinesKeydown(event, markdownView, activeView, fallbackEditor);
       }
     }, { capture: true });
 
-    this.registerDomEvent(document, "paste", (event: ClipboardEvent) => {
+    this.registerDomEvent(targetDoc, "paste", (event: ClipboardEvent) => {
       const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
       const activeView = markdownView ? undefined : this.getCanvasView(event);
 
@@ -140,12 +163,42 @@ export default class WikiPastePlugin extends Plugin {
         handleCanvasPaste(event, activeView);
       }
     }, { capture: true });
+  }
 
-    this.registerEvent(this.app.workspace.on("editor-change", (editor) => {
-      if (this.settings.escapeMarkdownSyntax || this.settings.convertLatexOnPaste) {
-        handleEditorChange(editor);
+  private attachIframeDocument(iframe: HTMLIFrameElement): void {
+    const attach = () => {
+      try {
+        if (iframe.contentDocument) {
+          this.attachDocumentListeners(iframe.contentDocument);
+        }
+      } catch {
+        // Ignore cross-origin iframes.
       }
-    }));
+    };
+
+    attach();
+    this.registerDomEvent(iframe, "load", attach);
+  }
+
+  private observeCanvasIframes(): void {
+    for (const iframe of Array.from(document.querySelectorAll<HTMLIFrameElement>("iframe.embed-iframe"))) {
+      this.attachIframeDocument(iframe);
+    }
+
+    this.iframeObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of Array.from(mutation.addedNodes)) {
+          if (node instanceof HTMLIFrameElement && node.classList.contains("embed-iframe")) {
+            this.attachIframeDocument(node);
+          } else if (node instanceof HTMLElement) {
+            for (const nested of Array.from(node.querySelectorAll<HTMLIFrameElement>("iframe.embed-iframe"))) {
+              this.attachIframeDocument(nested);
+            }
+          }
+        }
+      }
+    });
+    this.iframeObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   openIssueReportPage(): void {
@@ -180,7 +233,7 @@ export default class WikiPastePlugin extends Plugin {
     const target = event.target as Node | null;
     const canvasLeaves = this.app.workspace.getLeavesOfType("canvas");
     if (target) {
-      const matchingLeaf = canvasLeaves.find((leaf) => leaf.view.containerEl.contains(target));
+      const matchingLeaf = canvasLeaves.find((leaf) => containerContainsTarget(leaf.view.containerEl, target));
       if (matchingLeaf) {
         return matchingLeaf.view;
       }
@@ -200,6 +253,8 @@ export default class WikiPastePlugin extends Plugin {
   }
 
   onunload(): void {
+    this.iframeObserver?.disconnect();
+    this.iframeObserver = null;
     clearRecentInternalHtmlCopy(document);
     clearPendingCanvasMarkdown(document);
     closePasteOptionsPopup(document);

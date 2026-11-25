@@ -9,6 +9,7 @@ type SelectableEditor = Pick<Editor, "getCursor" | "getLine" | "setSelection">;
 
 export interface SelectLineOptions {
   isMacOS?: boolean;
+  fallbackEditor?: Editor | null;
 }
 
 function isSelectAllShortcut(event: KeyboardEvent, isMacOS: boolean): boolean {
@@ -27,8 +28,9 @@ function resolveSelectableEditor(
   target: Element | null,
   markdownView: MarkdownView | null,
   activeView?: unknown,
+  fallbackEditor?: Editor | null,
 ): SelectableEditor | null {
-  const editor = resolveActiveCmEditor(target, markdownView, activeView);
+  const editor = resolveActiveCmEditor(target, markdownView, activeView, fallbackEditor);
   if (
     editor
     && typeof editor.getCursor === "function"
@@ -51,7 +53,12 @@ export function handleSelectLineThenAllKeydown(
     return false;
   }
 
-  const editor = resolveSelectableEditor(event.target as Element | null, markdownView, activeView);
+  const editor = resolveSelectableEditor(
+    event.target as Element | null,
+    markdownView,
+    activeView,
+    options.fallbackEditor,
+  );
   if (!editor) {
     return false;
   }

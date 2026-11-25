@@ -11,8 +11,9 @@ function resolveMovableEditor(
   target: Element | null,
   markdownView: MarkdownView | null,
   activeView?: unknown,
+  fallbackEditor?: Editor | null,
 ): MovableEditor | null {
-  const editor = resolveActiveCmEditor(target, markdownView, activeView);
+  const editor = resolveActiveCmEditor(target, markdownView, activeView, fallbackEditor);
   if (
     editor
     && typeof editor.getCursor === "function"
@@ -31,6 +32,7 @@ export function handleMoveSelectedLinesKeydown(
   event: KeyboardEvent,
   markdownView: MarkdownView | null,
   activeView?: unknown,
+  fallbackEditor?: Editor | null,
 ): boolean {
   if (event.defaultPrevented || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
     return false;
@@ -41,7 +43,7 @@ export function handleMoveSelectedLinesKeydown(
     return false;
   }
 
-  const editor = resolveMovableEditor(event.target as Element | null, markdownView, activeView);
+  const editor = resolveMovableEditor(event.target as Element | null, markdownView, activeView, fallbackEditor);
   if (!editor) {
     return false;
   }

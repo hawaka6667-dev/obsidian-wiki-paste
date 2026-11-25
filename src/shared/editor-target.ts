@@ -1,6 +1,6 @@
 // @machine:
 // Shared type guards and target-resolution helpers for Canvas views and active CodeMirror editors.
-// Eliminates duplicate isCanvasView and Canvas-node DOM traversal across paste and shortcut modules.
+// Supports both direct DOM nodes and Canvas iframe.embed-iframe editors.
 
 import type { Editor, MarkdownView } from "obsidian";
 import type { CanvasAutoExpandNode } from "../auto-expand-canvas/canvas-auto-expand";
@@ -39,6 +39,19 @@ export function isCanvasView(view: unknown): view is CanvasViewLike {
   return candidate.getViewType?.() === "canvas" && Boolean(candidate.canvas);
 }
 
+export function containerContainsTarget(container: HTMLElement | undefined, target: Node | null): boolean {
+  if (!container || !target) {
+    return false;
+  }
+
+  if (container.contains(target)) {
+    return true;
+  }
+
+  const frameElement = target.ownerDocument?.defaultView?.frameElement ?? null;
+  return Boolean(frameElement && container.contains(frameElement));
+}
+
 export function findCanvasNodeForTarget(view: unknown, target: Element): CanvasNodeLike | undefined {
   if (!isCanvasView(view)) {
     return undefined;
@@ -68,14 +81,20 @@ export function resolveActiveCmEditor(
   target: Element | null,
   markdownView: MarkdownView | null,
   activeView?: unknown,
+  fallbackEditor?: Editor | null,
 ): Partial<Editor> | null {
   if (!target?.closest?.(".cm-content")) {
     return null;
   }
 
-  if (markdownView && markdownView.containerEl.contains(target)) {
+  if (markdownView && containerContainsTarget(markdownView.containerEl, target)) {
     return markdownView.editor;
   }
 
-  return findCanvasNodeForTarget(activeView, target)?.child?.editor ?? null;
+  const canvasEditor = findCanvasNodeForTarget(activeView, target)?.child?.editor;
+  if (canvasEditor) {
+    return canvasEditor;
+  }
+
+  return fallbackEditor ?? null;
 }

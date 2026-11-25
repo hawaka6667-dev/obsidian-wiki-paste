@@ -123,5 +123,13 @@ test("Alt+Up/Down swaps single and multi-line selections in Markdown and Canvas 
   assert.deepEqual(editor.lines, ["zero", "one", "two", "three"]);
   assert.deepEqual(editor.selection, { anchor: { line: 2, ch: 3 }, head: { line: 1, ch: 1 } });
 
+  // Also works when Canvas card editor lives inside an iframe.embed-iframe (or via fallbackEditor)
+  const iframeDom = new JSDOM("<div class='cm-content'></div>");
+  const iframeCm = iframeDom.window.document.querySelector(".cm-content");
+  const fallbackEd = createEditor(["iframe line"], { line: 0, ch: 2 });
+  assert.equal(handleSelectLineThenAllKeydown(createKeydownEvent(iframeCm, "a", { ctrlKey: true }), null, canvasView, { fallbackEditor: fallbackEd }), true);
+  assert.deepEqual(fallbackEd.selection, { anchor: { line: 0, ch: 0 }, head: { line: 0, ch: "iframe line".length } });
+  iframeDom.window.close();
+
   dom.window.close();
 });
