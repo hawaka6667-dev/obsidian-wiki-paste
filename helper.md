@@ -50,7 +50,7 @@ Enhances Obsidian Markdown and Canvas editing/pasting: converts web and AI-chat 
 - `src/escape-markdown-syntax/`: `md-editor-paste-handler.ts`, `md-syntax-escaping.ts`, `md-escape-optimization.ts` (lookbehind-free escaping).
 - `src/paste-options/`: `[Hack]` inert Word-style popup (`paste-options-popup.ts`, `paste-options-menu.ts`, `paste-options-positioning.ts`).
 - `src/paste-to-html/paste-to-html.ts`: `[Hack]` raw clipboard HTML paste.
-- `tests/`: `canvas-auto-expand.test.mjs`, `card-copy-to-markdown.test.mjs`, `latex-paste.test.mjs`, `md-editor-paste-handler.test.mjs`, `md-syntax-escaping.test.mjs`, `move-selected-lines.test.mjs`, `select-line-then-all.test.mjs`, `escape-cases.json`.
+- `tests/`: `canvas-auto-expand.test.mjs`, `card-copy-to-markdown.test.mjs`, `editor-actions.test.mjs`, `issue-report.test.mjs`, `latex-paste.test.mjs`, `md-paste-escaping.test.mjs`.
 - `docs/legacy/`: archived historical notes and reference fixtures (`table.md`, `md-syntax-escaping.md`, `design doc.md`, `test.md`).
 
 ## Validation & Delivery
