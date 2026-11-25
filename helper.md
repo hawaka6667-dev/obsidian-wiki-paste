@@ -31,11 +31,12 @@
 ## Current Behavior
 
 - Plugin id: `wiki-paste`; minimum Obsidian version: `1.5.0`.
-- Default settings: `convertLatexOnPaste`, `autoExpandCanvasCards`, and
-	`canvasCardCopyToMarkdown` are enabled by default; `[Hack]` options
-	(`escapeMarkdownSyntax`, `showPasteOptionsPopup`, `pasteWebContentAsHtml`)
-	default to `false` and persist independently with Obsidian `loadData` / `saveData`.
-	`escapeFootnoteReferences` is a migration fallback for `escapeMarkdownSyntax`.
+- Default settings: `convertLatexOnPaste`, `autoExpandCanvasCards`,
+	`canvasCardCopyToMarkdown`, and `selectLineBeforeAll` are enabled by default;
+	`[Hack]` options (`escapeMarkdownSyntax`, `showPasteOptionsPopup`,
+	`pasteWebContentAsHtml`) default to `false` and persist independently with
+	Obsidian `loadData` / `saveData`. `escapeFootnoteReferences` is a migration
+	fallback for `escapeMarkdownSyntax`.
 - Paste and syntax-escaping behavior is documented in
 	[md-syntax-escaping.md](md-syntax-escaping.md) as input/output cases; do not
 	duplicate the case list in this quick-context file.
@@ -166,6 +167,9 @@
 - `src/card-copy-to-markdown/card-copy-to-markdown.ts`: snapshots selected text
 	cards on native Canvas copy/cut and consumes the Markdown on the next editor
 	paste.
+- `src/select-line-then-all/select-line-then-all.ts`: OneNote-style progressive
+	`Ctrl+A` (first press selects current line; second press falls through to native
+	Select All) for Markdown and Canvas card editors.
 - `src/latex-paste/latex-paste.ts` and `src/latex-paste/mathml-to-latex.ts`:
 	web/AI math DOM extraction, MathML-to-LaTeX fallback, `\(...\)`/`\[...\]`
 	delimiter conversion, and `$...$`/`$$...$$` span protection.

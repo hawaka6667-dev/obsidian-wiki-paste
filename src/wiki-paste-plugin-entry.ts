@@ -23,12 +23,14 @@ import {
   pasteClipboardHtml,
   rememberInternalHtmlCopy,
 } from "./paste-to-html/paste-to-html";
+import { handleSelectLineThenAllKeydown } from "./select-line-then-all/select-line-then-all";
 
 interface WikiPasteSettings {
   escapeMarkdownSyntax: boolean;
   convertLatexOnPaste: boolean;
   autoExpandCanvasCards: boolean;
   canvasCardCopyToMarkdown: boolean;
+  selectLineBeforeAll: boolean;
   showPasteOptionsPopup: boolean;
   pasteWebContentAsHtml: boolean;
 }
@@ -42,6 +44,7 @@ const DEFAULT_SETTINGS: WikiPasteSettings = {
   convertLatexOnPaste: true,
   autoExpandCanvasCards: true,
   canvasCardCopyToMarkdown: true,
+  selectLineBeforeAll: true,
   showPasteOptionsPopup: false,
   pasteWebContentAsHtml: false,
 };
@@ -58,6 +61,7 @@ export default class WikiPastePlugin extends Plugin {
       convertLatexOnPaste: savedSettings?.convertLatexOnPaste ?? DEFAULT_SETTINGS.convertLatexOnPaste,
       autoExpandCanvasCards: savedSettings?.autoExpandCanvasCards ?? DEFAULT_SETTINGS.autoExpandCanvasCards,
       canvasCardCopyToMarkdown: savedSettings?.canvasCardCopyToMarkdown ?? DEFAULT_SETTINGS.canvasCardCopyToMarkdown,
+      selectLineBeforeAll: savedSettings?.selectLineBeforeAll ?? DEFAULT_SETTINGS.selectLineBeforeAll,
       showPasteOptionsPopup: savedSettings?.showPasteOptionsPopup ?? DEFAULT_SETTINGS.showPasteOptionsPopup,
       pasteWebContentAsHtml: savedSettings?.pasteWebContentAsHtml ?? DEFAULT_SETTINGS.pasteWebContentAsHtml,
     };
@@ -94,6 +98,16 @@ export default class WikiPastePlugin extends Plugin {
       clearRecentInternalHtmlCopy(document);
       clearPendingCanvasMarkdown(document);
     });
+
+    this.registerDomEvent(document, "keydown", (event: KeyboardEvent) => {
+      if (!this.settings.selectLineBeforeAll) {
+        return;
+      }
+
+      const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      const activeView = markdownView ? undefined : this.getCanvasView(event);
+      handleSelectLineThenAllKeydown(event, markdownView, activeView);
+    }, { capture: true });
 
     this.registerDomEvent(document, "paste", (event: ClipboardEvent) => {
       const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -169,6 +183,11 @@ export default class WikiPastePlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
+  async setSelectLineBeforeAllEnabled(enabled: boolean): Promise<void> {
+    this.settings.selectLineBeforeAll = enabled;
+    await this.saveData(this.settings);
+  }
+
   async setPasteOptionsPopupEnabled(enabled: boolean): Promise<void> {
     this.settings.showPasteOptionsPopup = enabled;
     if (!enabled) {
@@ -177,7 +196,7 @@ export default class WikiPastePlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-  private getCanvasView(event: ClipboardEvent): View | undefined {
+  private getCanvasView(event: Event): View | undefined {
     const target = event.target as Node | null;
     const canvasLeaves = this.app.workspace.getLeavesOfType("canvas");
     if (target) {
@@ -253,6 +272,13 @@ class WikiPasteSettingTab extends PluginSettingTab {
       .addToggle((toggle) => toggle
         .setValue(this.plugin.settings.canvasCardCopyToMarkdown)
         .onChange((enabled) => this.plugin.setCanvasCardCopyToMarkdownEnabled(enabled)));
+
+    new Setting(containerEl)
+      .setName("OneNote-style Ctrl+A (select line, then all)")
+      .setDesc("First Ctrl+A selects the current line in the editor; pressing Ctrl+A again selects the entire note.")
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.selectLineBeforeAll)
+        .onChange((enabled) => this.plugin.setSelectLineBeforeAllEnabled(enabled)));
 
     new Setting(containerEl)
       .setName("[Hack] Show paste options popup")

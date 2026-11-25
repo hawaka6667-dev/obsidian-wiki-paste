@@ -1,6 +1,6 @@
 // @machine:
 // Snapshots one selected Canvas text card on copy/cut and consumes its Markdown on the next editor or Canvas-card paste.
-import type { MarkdownView } from "obsidian";
+import type { Editor, MarkdownView } from "obsidian";
 import type { CanvasAutoExpandNode } from "../auto-expand-canvas/canvas-auto-expand";
 
 interface CanvasNodeData {
@@ -12,10 +12,10 @@ interface TextInsertionTarget {
   replaceSelection: (text: string) => void;
 }
 
-interface CanvasNode extends Omit<Partial<CanvasAutoExpandNode>, "getData"> {
+export interface CanvasNode extends Omit<Partial<CanvasAutoExpandNode>, "getData"> {
   getData?: () => CanvasNodeData;
   child?: {
-    editor?: TextInsertionTarget;
+    editor?: TextInsertionTarget & Partial<Editor>;
   };
 }
 
@@ -142,7 +142,11 @@ function resolvePasteTarget(
   return null;
 }
 
-function findCanvasNodeForTarget(view: CanvasView, target: Element): CanvasNode | undefined {
+export function findCanvasNodeForTarget(view: unknown, target: Element): CanvasNode | undefined {
+  if (!isCanvasView(view)) {
+    return undefined;
+  }
+
   const nodes = view.canvas?.nodes;
   const candidates: CanvasNode[] = [];
   if (nodes instanceof Map) {
