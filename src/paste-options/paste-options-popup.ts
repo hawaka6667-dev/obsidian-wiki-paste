@@ -15,36 +15,33 @@ export function showPasteOptionsPopup(editorContainerEl: HTMLElement, Menu: Menu
   const doc = editorContainerEl.ownerDocument;
   closePasteOptionsPopup(doc);
 
-  const root = doc.createElement("div");
-  root.className = "wiki-paste-options-popup";
-  root.setAttribute("data-placement", "below");
+  const root = doc.body.createDiv({
+    cls: "wiki-paste-options-popup",
+    attr: { "data-placement": "below" },
+  });
 
-  const trigger = doc.createElement("button");
-  trigger.type = "button";
-  trigger.className = "wiki-paste-options-trigger";
-  trigger.setAttribute("aria-label", "Paste options");
-  trigger.setAttribute("aria-haspopup", "menu");
-  trigger.setAttribute("aria-expanded", "false");
-  trigger.title = "Paste options";
+  const trigger = root.createEl("button", {
+    type: "button",
+    cls: "wiki-paste-options-trigger",
+    title: "Paste options",
+    attr: {
+      "aria-label": "Paste options",
+      "aria-haspopup": "menu",
+      "aria-expanded": "false",
+    },
+  });
 
-  const clipboardIcon = doc.createElement("span");
-  clipboardIcon.className = "wiki-paste-options-clipboard-icon";
-  clipboardIcon.setAttribute("aria-hidden", "true");
-  trigger.append(clipboardIcon);
-
-  const shortcut = doc.createElement("span");
-  shortcut.className = "wiki-paste-options-shortcut";
-  shortcut.textContent = "(Ctrl)";
-  trigger.append(shortcut);
-
-  const chevron = doc.createElement("span");
-  chevron.className = "wiki-paste-options-chevron";
-  chevron.setAttribute("aria-hidden", "true");
-  trigger.append(chevron);
-  root.append(trigger);
+  trigger.createSpan({
+    cls: "wiki-paste-options-clipboard-icon",
+    attr: { "aria-hidden": "true" },
+  });
+  trigger.createSpan({ cls: "wiki-paste-options-shortcut", text: "(Ctrl)" });
+  trigger.createSpan({
+    cls: "wiki-paste-options-chevron",
+    attr: { "aria-hidden": "true" },
+  });
 
   trigger.addEventListener("pointerdown", (event) => event.preventDefault());
-  doc.body.append(root);
   positionPasteOptionsPopup(root, editorContainerEl);
   activePopups.set(doc, root);
 

@@ -205,7 +205,7 @@ function joinParts(parts: string[]): string {
       const needsSpace =
         (/[A-Za-z]/.test(last) && /[A-Za-z0-9]/.test(first) && /\\[A-Za-z]+$/.test(out))
         || (/[=+\-*/<>|,]/.test(last) && !/^[,.)\]}\s]/.test(part))
-        || (!/^[.,;:!?)\]}/_^']/.test(part) && /[=<>+\-]/.test(first));
+        || (!/^[.,;:!?)\]}/_^']/.test(part) && /[=<>+-]/.test(first));
       if (needsSpace && !out.endsWith(" ")) {
         out += " ";
       }

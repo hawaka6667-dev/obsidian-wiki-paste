@@ -112,7 +112,7 @@ function collectBlockSyntax(line: string, mark: EscapeMarker): void {
 
   const thematicBreak = /^ {0,3}(?:(?:\* *){3,}|(?:- *){3,}|(?:_ *){3,})(?:<br\s*\/?\s*>)?\s*$/i.exec(line);
   if (thematicBreak) {
-    mark(thematicBreak.index + thematicBreak[0].search(/[\*_-]/));
+    mark(thematicBreak.index + thematicBreak[0].search(/[*_-]/));
   }
 }
 

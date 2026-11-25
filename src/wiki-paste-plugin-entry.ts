@@ -1,7 +1,7 @@
 // @machine:
 // Loads and migrates settings, tracks Markdown editor copy/cut provenance, and registers paste listeners.
 // Delegates Markdown and Canvas events to their handlers and persists settings changes.
-import { htmlToMarkdown, MarkdownView, Menu, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
+import { htmlToMarkdown, MarkdownView, Menu, Plugin, PluginSettingTab, Setting, type App, type View } from "obsidian";
 import { autoExpandCanvasNode, type CanvasAutoExpandNode } from "./auto-expand-canvas/canvas-auto-expand";
 import { handleCanvasPaste } from "./auto-expand-canvas/canvas-paste";
 import { handleCanvasMarkdownPaste } from "./auto-expand-canvas/canvas-markdown-escape";
@@ -65,7 +65,7 @@ export default class WikiPastePlugin extends Plugin {
 
     this.registerDomEvent(document, "copy", (event: ClipboardEvent) => {
       if (this.settings.canvasCardCopyToMarkdown) {
-        handleCanvasCardClipboardEvent(event, document, this.app.workspace.activeLeaf?.view);
+        handleCanvasCardClipboardEvent(event, document, this.getCanvasView(event));
       }
     }, { capture: true });
     this.registerDomEvent(document, "copy", (event: ClipboardEvent) => {
@@ -78,7 +78,7 @@ export default class WikiPastePlugin extends Plugin {
     });
     this.registerDomEvent(document, "cut", (event: ClipboardEvent) => {
       if (this.settings.canvasCardCopyToMarkdown) {
-        handleCanvasCardClipboardEvent(event, document, this.app.workspace.activeLeaf?.view);
+        handleCanvasCardClipboardEvent(event, document, this.getCanvasView(event));
       }
     }, { capture: true });
     this.registerDomEvent(document, "cut", (event: ClipboardEvent) => {
@@ -97,7 +97,7 @@ export default class WikiPastePlugin extends Plugin {
 
     this.registerDomEvent(document, "paste", (event: ClipboardEvent) => {
       const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-      const activeView = this.app.workspace.activeLeaf?.view;
+      const activeView = markdownView ? undefined : this.getCanvasView(event);
 
       if (this.settings.showPasteOptionsPopup && markdownView) {
         this.schedulePasteOptionsPopup(markdownView, event);
@@ -177,6 +177,20 @@ export default class WikiPastePlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
+  private getCanvasView(event: ClipboardEvent): View | undefined {
+    const target = event.target as Node | null;
+    const canvasLeaves = this.app.workspace.getLeavesOfType("canvas");
+    if (target) {
+      const matchingLeaf = canvasLeaves.find((leaf) => leaf.view.containerEl.contains(target));
+      if (matchingLeaf) {
+        return matchingLeaf.view;
+      }
+    }
+
+    const recentLeaf = this.app.workspace.getMostRecentLeaf();
+    return recentLeaf?.view?.getViewType() === "canvas" ? recentLeaf.view : undefined;
+  }
+
   private schedulePasteOptionsPopup(view: MarkdownView, event: ClipboardEvent): void {
     const target = event.target as Element | null;
     if (!target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
@@ -206,7 +220,7 @@ class WikiPasteSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     const { manifest } = this.plugin;
-    containerEl.createEl("h2", { text: manifest.name });
+    new Setting(containerEl).setName(manifest.name).setHeading();
     containerEl.createEl("p", { text: manifest.description });
     containerEl.createEl("p", {
       text: `Version ${manifest.version} | Plugin ID: ${manifest.id} | Requires Obsidian ${manifest.minAppVersion}+ | By ${manifest.author}`,

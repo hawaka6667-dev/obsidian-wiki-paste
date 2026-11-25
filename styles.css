@@ -107,6 +107,11 @@
   display: none;
 }
 
+.wiki-paste-options-heading,
+.wiki-paste-options-label {
+  text-align: left;
+}
+
 .wiki-paste-options-popup .wiki-paste-options-menu .wiki-paste-options-heading {
   padding: 7px 14px 8px;
   color: var(--text-normal);

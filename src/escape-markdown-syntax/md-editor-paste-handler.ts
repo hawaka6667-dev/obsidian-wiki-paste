@@ -117,7 +117,7 @@ export function handleEditorPaste(
       convertLatexOnPaste: shouldConvertLatex,
     };
     pendingHtmlPastes.set(editor, pendingPaste);
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (pendingHtmlPastes.get(editor) === pendingPaste) {
         pendingHtmlPastes.delete(editor);
       }

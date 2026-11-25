@@ -499,9 +499,8 @@ function replaceMathElementWithPlaceholder(
   extracted.push({ token, tex: cleanedTex, display });
 
   if (display) {
-    const block = doc.createElement("p");
-    block.textContent = token;
-    target.replaceWith(block);
+    target.insertAdjacentHTML("beforebegin", `<p>${token}</p>`);
+    target.remove();
   } else {
     target.replaceWith(doc.createTextNode(token));
   }
@@ -693,7 +692,7 @@ export function convertWebHtmlWithLatex(
   doc: Document,
   htmlToMarkdown: (element: HTMLElement) => string,
 ): { markdown: string; hasMath: boolean } {
-  const Parser = doc.defaultView?.DOMParser ?? globalThis.DOMParser;
+  const Parser = doc.defaultView?.DOMParser ?? window.DOMParser;
   if (!Parser || !html) {
     return { markdown: "", hasMath: false };
   }
