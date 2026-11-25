@@ -1,14 +1,23 @@
 // @machine:
 // Handles paste events inside the active Obsidian Markdown editor.
-// Tracks in-editor copies and cuts so matching Markdown pastes bypass webpage syntax escaping.
-// Snapshots external rich pastes and post-processes Obsidian's conversion on editor-change.
+// Tracks in-editor copies and cuts so matching Markdown pastes bypass webpage transformations.
+// Converts web/AI LaTeX formulas, snapshots native rich pastes, and applies optional syntax escaping.
 import type { Editor, MarkdownView } from "obsidian";
+import { convertLatexDelimiters, convertWebHtmlWithLatex } from "../latex-paste/latex-paste";
 import { escapeMarkdownSyntax, escapeObsidianSyntax } from "./md-syntax-escaping";
+
+export interface EditorPasteOptions {
+  escapeMarkdownSyntax?: boolean;
+  convertLatexOnPaste?: boolean;
+  htmlToMarkdown?: (element: HTMLElement) => string;
+}
 
 interface PendingHtmlPaste {
   value: string;
   selectionFrom: number;
   selectionTo: number;
+  escapeMarkdownSyntax: boolean;
+  convertLatexOnPaste: boolean;
 }
 
 const pendingHtmlPastes = new WeakMap<Editor, PendingHtmlPaste>();
@@ -56,10 +65,20 @@ export function consumeRecentInternalMarkdownCopy(document: Document, clipboardT
   return clipboardText === recentCopy.text;
 }
 
-export function handleEditorPaste(event: ClipboardEvent, view: MarkdownView): boolean {
+export function handleEditorPaste(
+  event: ClipboardEvent,
+  view: MarkdownView,
+  options: EditorPasteOptions = {},
+): boolean {
   const target = event.target as Element | null;
 
   if (!target?.closest?.(".cm-content") || !view.containerEl.contains(target)) {
+    return false;
+  }
+
+  const shouldEscape = options.escapeMarkdownSyntax ?? true;
+  const shouldConvertLatex = options.convertLatexOnPaste ?? false;
+  if (!shouldEscape && !shouldConvertLatex) {
     return false;
   }
 
@@ -72,11 +91,30 @@ export function handleEditorPaste(event: ClipboardEvent, view: MarkdownView): bo
   const clipboardHtml = clipboardData?.getData("text/html");
 
   if (clipboardHtml) {
+    if (shouldConvertLatex && options.htmlToMarkdown) {
+      const converted = convertWebHtmlWithLatex(
+        clipboardHtml,
+        view.containerEl.ownerDocument,
+        options.htmlToMarkdown,
+      );
+      if (converted.hasMath) {
+        const finalMarkdown = shouldEscape
+          ? escapeObsidianSyntax(converted.markdown, { preserveLatex: true })
+          : converted.markdown;
+        event.preventDefault();
+        event.stopPropagation();
+        view.editor.replaceSelection(finalMarkdown);
+        return true;
+      }
+    }
+
     const editor = view.editor;
     const pendingPaste: PendingHtmlPaste = {
       value: editor.getValue(),
       selectionFrom: editor.posToOffset(editor.getCursor("from")),
       selectionTo: editor.posToOffset(editor.getCursor("to")),
+      escapeMarkdownSyntax: shouldEscape,
+      convertLatexOnPaste: shouldConvertLatex,
     };
     pendingHtmlPastes.set(editor, pendingPaste);
     setTimeout(() => {
@@ -91,7 +129,10 @@ export function handleEditorPaste(event: ClipboardEvent, view: MarkdownView): bo
     return false;
   }
 
-  const convertedText = escapeMarkdownSyntax(clipboardText);
+  let convertedText = shouldConvertLatex ? convertLatexDelimiters(clipboardText) : clipboardText;
+  if (shouldEscape) {
+    convertedText = escapeMarkdownSyntax(convertedText, { preserveLatex: shouldConvertLatex });
+  }
 
   if (convertedText === clipboardText) {
     return false;
@@ -126,7 +167,10 @@ export function handleEditorChange(editor: Editor): boolean {
   }
 
   const insertedText = currentValue.slice(changeStart, insertedEnd);
-  const convertedText = escapeObsidianSyntax(insertedText);
+  let convertedText = pendingPaste.convertLatexOnPaste ? convertLatexDelimiters(insertedText) : insertedText;
+  if (pendingPaste.escapeMarkdownSyntax) {
+    convertedText = escapeObsidianSyntax(convertedText, { preserveLatex: pendingPaste.convertLatexOnPaste });
+  }
   if (convertedText === insertedText) {
     return false;
   }

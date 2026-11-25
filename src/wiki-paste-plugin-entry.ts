@@ -1,10 +1,10 @@
 // @machine:
 // Loads and migrates settings, tracks Markdown editor copy/cut provenance, and registers paste listeners.
 // Delegates Markdown and Canvas events to their handlers and persists settings changes.
-import { MarkdownView, Menu, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
+import { htmlToMarkdown, MarkdownView, Menu, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
+import { autoExpandCanvasNode, type CanvasAutoExpandNode } from "./auto-expand-canvas/canvas-auto-expand";
 import { handleCanvasPaste } from "./auto-expand-canvas/canvas-paste";
 import { handleCanvasMarkdownPaste } from "./auto-expand-canvas/canvas-markdown-escape";
-import { handleCanvasEditPaste } from "./auto-expand-canvas/canvas-paste-card";
 import {
   clearPendingCanvasMarkdown,
   handleCanvasCardClipboardEvent,
@@ -26,6 +26,7 @@ import {
 
 interface WikiPasteSettings {
   escapeMarkdownSyntax: boolean;
+  convertLatexOnPaste: boolean;
   autoExpandCanvasCards: boolean;
   canvasCardCopyToMarkdown: boolean;
   showPasteOptionsPopup: boolean;
@@ -37,11 +38,12 @@ interface StoredWikiPasteSettings extends Partial<WikiPasteSettings> {
 }
 
 const DEFAULT_SETTINGS: WikiPasteSettings = {
-  escapeMarkdownSyntax: true,
+  escapeMarkdownSyntax: false,
+  convertLatexOnPaste: true,
   autoExpandCanvasCards: true,
   canvasCardCopyToMarkdown: true,
-  showPasteOptionsPopup: true,
-  pasteWebContentAsHtml: true,
+  showPasteOptionsPopup: false,
+  pasteWebContentAsHtml: false,
 };
 
 export default class WikiPastePlugin extends Plugin {
@@ -53,6 +55,7 @@ export default class WikiPastePlugin extends Plugin {
       escapeMarkdownSyntax: savedSettings?.escapeMarkdownSyntax
         ?? savedSettings?.escapeFootnoteReferences
         ?? DEFAULT_SETTINGS.escapeMarkdownSyntax,
+      convertLatexOnPaste: savedSettings?.convertLatexOnPaste ?? DEFAULT_SETTINGS.convertLatexOnPaste,
       autoExpandCanvasCards: savedSettings?.autoExpandCanvasCards ?? DEFAULT_SETTINGS.autoExpandCanvasCards,
       canvasCardCopyToMarkdown: savedSettings?.canvasCardCopyToMarkdown ?? DEFAULT_SETTINGS.canvasCardCopyToMarkdown,
       showPasteOptionsPopup: savedSettings?.showPasteOptionsPopup ?? DEFAULT_SETTINGS.showPasteOptionsPopup,
@@ -100,7 +103,17 @@ export default class WikiPastePlugin extends Plugin {
         this.schedulePasteOptionsPopup(markdownView, event);
       }
 
-      if (this.settings.canvasCardCopyToMarkdown && handleCardMarkdownPaste(event, document, markdownView)) {
+      if (this.settings.canvasCardCopyToMarkdown && handleCardMarkdownPaste(
+        event,
+        document,
+        markdownView,
+        activeView,
+        (node) => {
+          if (this.settings.autoExpandCanvasCards && node.nodeEl && node.canvas && node.getData && node.setData) {
+            window.requestAnimationFrame(() => void autoExpandCanvasNode(node as CanvasAutoExpandNode));
+          }
+        },
+      )) {
         return;
       }
 
@@ -108,23 +121,26 @@ export default class WikiPastePlugin extends Plugin {
         return;
       }
 
-      if (this.settings.escapeMarkdownSyntax) {
+      if (this.settings.escapeMarkdownSyntax || this.settings.convertLatexOnPaste) {
+        const pasteOptions = {
+          escapeMarkdownSyntax: this.settings.escapeMarkdownSyntax,
+          convertLatexOnPaste: this.settings.convertLatexOnPaste,
+          htmlToMarkdown,
+        };
         if (markdownView) {
-          handleEditorPaste(event, markdownView);
+          handleEditorPaste(event, markdownView, pasteOptions);
         } else if (activeView) {
-          handleCanvasMarkdownPaste(event, activeView);
+          handleCanvasMarkdownPaste(event, activeView, pasteOptions);
         }
       }
 
-      if (this.settings.autoExpandCanvasCards) {
-        if (activeView && !handleCanvasEditPaste(event, activeView)) {
-          handleCanvasPaste(event, activeView);
-        }
+      if (this.settings.autoExpandCanvasCards && activeView) {
+        handleCanvasPaste(event, activeView);
       }
     }, { capture: true });
 
     this.registerEvent(this.app.workspace.on("editor-change", (editor) => {
-      if (this.settings.escapeMarkdownSyntax) {
+      if (this.settings.escapeMarkdownSyntax || this.settings.convertLatexOnPaste) {
         handleEditorChange(editor);
       }
     }));
@@ -132,6 +148,11 @@ export default class WikiPastePlugin extends Plugin {
 
   async setMarkdownEscapingEnabled(enabled: boolean): Promise<void> {
     this.settings.escapeMarkdownSyntax = enabled;
+    await this.saveData(this.settings);
+  }
+
+  async setConvertLatexOnPasteEnabled(enabled: boolean): Promise<void> {
+    this.settings.convertLatexOnPaste = enabled;
     await this.saveData(this.settings);
   }
 
@@ -192,11 +213,18 @@ class WikiPasteSettingTab extends PluginSettingTab {
     });
 
     new Setting(containerEl)
-      .setName("Escape pasted Markdown syntax")
-      .setDesc("Prevent Markdown and Obsidian syntax in plain-text pastes from being rendered as formatting.")
+      .setName("[Hack] Escape pasted Markdown syntax")
+      .setDesc("Legacy / incomplete: prevent Markdown and Obsidian syntax in plain-text pastes from being rendered as formatting.")
       .addToggle((toggle) => toggle
         .setValue(this.plugin.settings.escapeMarkdownSyntax)
         .onChange((enabled) => this.plugin.setMarkdownEscapingEnabled(enabled)));
+
+    new Setting(containerEl)
+      .setName("Convert and preserve pasted LaTeX")
+      .setDesc("Convert copied web/AI math formulas and \\(...\\) / \\[...\\] delimiters to $...$ and $$...$$, and keep LaTeX unescaped.")
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.convertLatexOnPaste)
+        .onChange((enabled) => this.plugin.setConvertLatexOnPasteEnabled(enabled)));
 
     new Setting(containerEl)
       .setName("Auto-expand pasted Canvas cards")
@@ -206,22 +234,22 @@ class WikiPasteSettingTab extends PluginSettingTab {
         .onChange((enabled) => this.plugin.setCanvasAutoExpandEnabled(enabled)));
 
     new Setting(containerEl)
-      .setName("Paste copied or cut Canvas cards to Markdown")
-      .setDesc("Paste a single copied or cut Canvas text card as Markdown in the editor.")
+      .setName("Paste copied or cut Canvas cards to Markdown / Canvas card")
+      .setDesc("Paste a single copied or cut Canvas text card as Markdown into the editor or another Canvas card.")
       .addToggle((toggle) => toggle
         .setValue(this.plugin.settings.canvasCardCopyToMarkdown)
         .onChange((enabled) => this.plugin.setCanvasCardCopyToMarkdownEnabled(enabled)));
 
     new Setting(containerEl)
-      .setName("Show paste options popup")
-      .setDesc("Show a Word-style paste options menu after pasting in the Markdown editor. Options are visual only.")
+      .setName("[Hack] Show paste options popup")
+      .setDesc("Incomplete prototype: show a Word-style paste options menu after pasting in the Markdown editor. Options are visual only.")
       .addToggle((toggle) => toggle
         .setValue(this.plugin.settings.showPasteOptionsPopup)
         .onChange((enabled) => this.plugin.setPasteOptionsPopupEnabled(enabled)));
 
     new Setting(containerEl)
-      .setName("Paste web content as raw HTML")
-      .setDesc("Insert webpage HTML unchanged in the Markdown editor instead of using Obsidian's conversion.")
+      .setName("[Hack] Paste web content as raw HTML")
+      .setDesc("Experimental / incomplete: insert webpage HTML unchanged in the Markdown editor instead of using Obsidian's conversion.")
       .addToggle((toggle) => toggle
         .setValue(this.plugin.settings.pasteWebContentAsHtml)
         .onChange(async (enabled) => {

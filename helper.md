@@ -31,12 +31,11 @@
 ## Current Behavior
 
 - Plugin id: `wiki-paste`; minimum Obsidian version: `1.5.0`.
-- All three feature settings are enabled by default and persisted independently with
-	Obsidian `loadData` / `saveData`; `escapeFootnoteReferences` is a migration
-	fallback for the Markdown escaping setting.
-- The fourth setting, `showPasteOptionsPopup`, is enabled by default and displays
-	an inert Word-style options popup after Markdown-editor paste. Its menu choices
-	only dismiss the popup; they do not change pasted content or call an API.
+- Default settings: `convertLatexOnPaste`, `autoExpandCanvasCards`, and
+	`canvasCardCopyToMarkdown` are enabled by default; `[Hack]` options
+	(`escapeMarkdownSyntax`, `showPasteOptionsPopup`, `pasteWebContentAsHtml`)
+	default to `false` and persist independently with Obsidian `loadData` / `saveData`.
+	`escapeFootnoteReferences` is a migration fallback for `escapeMarkdownSyntax`.
 - Paste and syntax-escaping behavior is documented in
 	[md-syntax-escaping.md](md-syntax-escaping.md) as input/output cases; do not
 	duplicate the case list in this quick-context file.
@@ -87,15 +86,16 @@
 - Visual test: use a Canvas fixture in `local-testing/`; compare the rendered
 	content and card bounds for the developer-selected scenario.
 
-### Paste Canvas text cards as Markdown
+### Paste Canvas text cards to Markdown / Canvas card
 
 - Setting: `canvasCardCopyToMarkdown`, enabled by default and independent of
 	`escapeMarkdownSyntax` and `autoExpandCanvasCards`.
 - Boundary: on native Canvas `copy` or `cut`, snapshot the sole selected text
 	node's `getData().text` without preventing the native clipboard or cut action.
-	The next paste into a Markdown editor consumes that one-shot Markdown value,
-	without requiring native clipboard MIME data; multi-selection and non-text
-	cards are left to Obsidian.
+	The next paste into a Markdown editor or another Canvas text card's editor
+	(`.cm-content`) consumes that one-shot Markdown value, without requiring native
+	clipboard MIME data; multi-selection, non-text cards, and non-editor Canvas
+	background pastes are left to Obsidian.
 - Confirmed user scenario: copy or cut one text card, switch to a Markdown
 	editor, and paste; verify exact Markdown insertion and unchanged native copy/
 	cut behavior. Automated coverage includes copy/cut snapshots, MIME-free paste,
@@ -110,6 +110,21 @@
 	focus through the options and Enter dismisses the selected option. Selection
 	does not change editor content, clipboard data, or paste formatting. Popup
 	positioning is not yet recorded as a verified behavior.
+
+### Convert and preserve pasted LaTeX
+
+- Setting: `convertLatexOnPaste`, enabled by default and independent of
+	`escapeMarkdownSyntax` and `pasteWebContentAsHtml`.
+- Boundary: applies to external webpage and AI-chat pastes in both Markdown editor
+	and Canvas (unless `pasteWebContentAsHtml` intercepts raw HTML first); matching
+	internal Obsidian copies/cuts are bypassed.
+- Extracts rendered web math DOM nodes (KaTeX, Wikipedia `.mwe-math-element`,
+	MathJax v2/v3 including pure MathML fallback, Zhihu/Gemini `data-*` attributes,
+	`<math-renderer>`, standalone `<math>`) via `htmlToMarkdown` with opaque
+	placeholders, and converts plain-text `\(...\)` / `\[...\]` outside code blocks
+	and inline code to Obsidian `$...$` / `$$...$$`.
+- When `escapeMarkdownSyntax` is also enabled, `$...$` and `$$...$$` math spans
+	are protected so LaTeX syntax is not escaped.
 
 ## Global Paste Execution Order
 
@@ -151,6 +166,9 @@
 - `src/card-copy-to-markdown/card-copy-to-markdown.ts`: snapshots selected text
 	cards on native Canvas copy/cut and consumes the Markdown on the next editor
 	paste.
+- `src/latex-paste/latex-paste.ts` and `src/latex-paste/mathml-to-latex.ts`:
+	web/AI math DOM extraction, MathML-to-LaTeX fallback, `\(...\)`/`\[...\]`
+	delimiter conversion, and `$...$`/`$$...$$` span protection.
 - `src/escape-markdown-syntax/md-editor-paste-handler.ts`: editor-target guard, rich-HTML
 	paste snapshot, Obsidian copy/cut provenance, post-conversion change handling,
 	plain-text transformation, and selection replacement.

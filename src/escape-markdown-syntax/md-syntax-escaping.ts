@@ -6,6 +6,11 @@
 // Sends fresh offsets to md-escape-optimization.ts and preserves source line endings.
 
 import { isMarkdownEscapablePunctuation, optimizeMarkdownEscapes } from "./md-escape-optimization";
+import { protectLatexSpans } from "../latex-paste/latex-paste";
+
+export interface SyntaxEscapeOptions {
+  preserveLatex?: boolean;
+}
 
 type EscapeMarker = (index: number) => void;
 
@@ -412,13 +417,15 @@ function escapeMarkdownTableLine(line: string): string {
   return output + escapeObsidianLine(line.slice(cellStart), true);
 }
 
-export function escapeObsidianSyntax(text: string): string {
-  const lines = text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+export function escapeObsidianSyntax(text: string, options: SyntaxEscapeOptions = {}): string {
+  const latexProtection = options.preserveLatex ? protectLatexSpans(text) : null;
+  const sourceText = latexProtection ? latexProtection.text : text;
+  const lines = sourceText.match(/[^\n]*\n|[^\n]+$/g) ?? [];
   const contentLines = lines.map((line) => line.replace(/\r?\n$/, ""));
   const markdownTableLines = findMarkdownTableLines(contentLines);
   let activeFence: { marker: string; length: number } | undefined;
 
-  return lines.map((line, index) => {
+  const escaped = lines.map((line, index) => {
     const lineEnding = line.endsWith("\r\n") ? "\r\n" : line.endsWith("\n") ? "\n" : "";
     const content = line.slice(0, line.length - lineEnding.length);
 
@@ -446,6 +453,8 @@ export function escapeObsidianSyntax(text: string): string {
 
     return `${escapeObsidianLine(content)}${lineEnding}`;
   }).join("");
+
+  return latexProtection ? latexProtection.restore(escaped) : escaped;
 }
 
 function collectSyntaxEscapes(line: string): Set<number> {
@@ -479,14 +488,18 @@ function getSyntaxContent(line: string): { content: string; indentationLength: n
   return { content: line, indentationLength: 0 };
 }
 
-export function escapeMarkdownSyntax(text: string): string {
-  const lines = text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+export function escapeMarkdownSyntax(text: string, options: SyntaxEscapeOptions = {}): string {
+  const latexProtection = options.preserveLatex ? protectLatexSpans(text) : null;
+  const sourceText = latexProtection ? latexProtection.text : text;
+  const lines = sourceText.match(/[^\n]*\n|[^\n]+$/g) ?? [];
 
-  return lines.map((line) => {
+  const escaped = lines.map((line) => {
     const lineEnding = line.endsWith("\r\n") ? "\r\n" : line.endsWith("\n") ? "\n" : "";
     const content = line.slice(0, line.length - lineEnding.length);
     const syntaxContent = getSyntaxContent(content);
     const escapeCandidates = collectSyntaxEscapes(syntaxContent.content);
     return `${optimizeMarkdownEscapes(content, escapeCandidates, syntaxContent.indentationLength)}${lineEnding}`;
   }).join("");
+
+  return latexProtection ? latexProtection.restore(escaped) : escaped;
 }

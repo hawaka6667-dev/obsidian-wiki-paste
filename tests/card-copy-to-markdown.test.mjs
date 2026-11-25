@@ -124,3 +124,62 @@ test("clears pending Markdown after a non-editor paste or an already-handled cli
 	clearPendingCanvasMarkdown(document);
 	dom.window.close();
 });
+
+test("pastes a copied Canvas text card into another Canvas text card editor (card-to-card)", () => {
+	const dom = new JSDOM(`
+		<div class='canvas'>
+			<div class='canvas-node source'></div>
+			<div class='canvas-node target'><div class='cm-content'></div></div>
+		</div>
+	`);
+	const document = dom.window.document;
+	const canvasContainer = document.querySelector(".canvas");
+	const sourceNodeEl = document.querySelector(".source");
+	const targetNodeEl = document.querySelector(".target");
+	const targetCmContent = targetNodeEl.querySelector(".cm-content");
+	const cardReplacements = [];
+	let pastedCallbackNode = null;
+
+	const sourceNode = {
+		nodeEl: sourceNodeEl,
+		getData: () => ({ type: "text", text: "# Source Card\n\n$E=mc^2$" }),
+	};
+	const targetNode = {
+		nodeEl: targetNodeEl,
+		getData: () => ({ type: "text", text: "" }),
+		child: {
+			editor: {
+				replaceSelection: (text) => cardReplacements.push(text),
+			},
+		},
+	};
+	const canvasView = {
+		getViewType: () => "canvas",
+		containerEl: canvasContainer,
+		canvas: {
+			selection: new Set([sourceNode]),
+			nodes: new Map([
+				["source", sourceNode],
+				["target", targetNode],
+			]),
+		},
+	};
+
+	assert.equal(handleCanvasCardClipboardEvent(createEvent(sourceNodeEl, "copy"), document, canvasView), true);
+
+	const paste = createEvent(targetCmContent, "paste", false);
+	assert.equal(
+		handleCardMarkdownPaste(paste, document, null, canvasView, (node) => {
+			pastedCallbackNode = node;
+		}),
+		true,
+	);
+	assert.equal(paste.defaultPrevented, true);
+	assert.equal(paste.propagationStopped, true);
+	assert.deepEqual(cardReplacements, ["# Source Card\n\n$E=mc^2$"]);
+	assert.equal(pastedCallbackNode, targetNode);
+	assert.equal(handleCardMarkdownPaste(createEvent(targetCmContent), document, null, canvasView), false);
+
+	clearPendingCanvasMarkdown(document);
+	dom.window.close();
+});
