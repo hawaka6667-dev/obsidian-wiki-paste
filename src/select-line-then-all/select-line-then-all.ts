@@ -3,11 +3,15 @@
 // First press selects the current logical line; a second press falls through to native Select All.
 
 import type { Editor, MarkdownView } from "obsidian";
-import { findCanvasNodeForTarget } from "../card-copy-to-markdown/card-copy-to-markdown";
+import { resolveActiveCmEditor } from "../card-copy-to-markdown/card-copy-to-markdown";
 
 type SelectableEditor = Pick<Editor, "getCursor" | "getLine" | "setSelection">;
 
-function isSelectAllShortcut(event: KeyboardEvent): boolean {
+export interface SelectLineOptions {
+  isMacOS?: boolean;
+}
+
+function isSelectAllShortcut(event: KeyboardEvent, isMacOS: boolean): boolean {
   if (event.defaultPrevented || event.repeat || event.altKey || event.shiftKey) {
     return false;
   }
@@ -16,9 +20,7 @@ function isSelectAllShortcut(event: KeyboardEvent): boolean {
     return false;
   }
 
-  const platform = typeof navigator !== "undefined" ? (navigator.platform || navigator.userAgent) : "";
-  const isMac = /mac/i.test(platform);
-  return isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  return isMacOS ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
 }
 
 function resolveSelectableEditor(
@@ -26,22 +28,14 @@ function resolveSelectableEditor(
   markdownView: MarkdownView | null,
   activeView?: unknown,
 ): SelectableEditor | null {
-  if (!target?.closest?.(".cm-content")) {
-    return null;
-  }
-
-  if (markdownView && markdownView.containerEl.contains(target)) {
-    return markdownView.editor;
-  }
-
-  const canvasEditor = findCanvasNodeForTarget(activeView, target)?.child?.editor;
+  const editor = resolveActiveCmEditor(target, markdownView, activeView);
   if (
-    canvasEditor
-    && typeof canvasEditor.getCursor === "function"
-    && typeof canvasEditor.getLine === "function"
-    && typeof canvasEditor.setSelection === "function"
+    editor
+    && typeof editor.getCursor === "function"
+    && typeof editor.getLine === "function"
+    && typeof editor.setSelection === "function"
   ) {
-    return canvasEditor as SelectableEditor;
+    return editor as SelectableEditor;
   }
 
   return null;
@@ -51,8 +45,9 @@ export function handleSelectLineThenAllKeydown(
   event: KeyboardEvent,
   markdownView: MarkdownView | null,
   activeView?: unknown,
+  options: SelectLineOptions = {},
 ): boolean {
-  if (!isSelectAllShortcut(event)) {
+  if (!isSelectAllShortcut(event, options.isMacOS ?? false)) {
     return false;
   }
 

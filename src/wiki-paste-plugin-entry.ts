@@ -1,7 +1,7 @@
 // @machine:
 // Loads and migrates settings, tracks Markdown editor copy/cut provenance, and registers paste listeners.
 // Delegates Markdown and Canvas events to their handlers and persists settings changes.
-import { htmlToMarkdown, MarkdownView, Menu, Plugin, PluginSettingTab, Setting, type App, type View } from "obsidian";
+import { htmlToMarkdown, MarkdownView, Menu, Platform, Plugin, PluginSettingTab, Setting, type App, type View } from "obsidian";
 import { autoExpandCanvasNode, type CanvasAutoExpandNode } from "./auto-expand-canvas/canvas-auto-expand";
 import { handleCanvasPaste } from "./auto-expand-canvas/canvas-paste";
 import { handleCanvasMarkdownPaste } from "./auto-expand-canvas/canvas-markdown-escape";
@@ -24,6 +24,7 @@ import {
   rememberInternalHtmlCopy,
 } from "./paste-to-html/paste-to-html";
 import { handleSelectLineThenAllKeydown } from "./select-line-then-all/select-line-then-all";
+import { handleMoveSelectedLinesKeydown } from "./move-selected-lines/move-selected-lines";
 
 interface WikiPasteSettings {
   escapeMarkdownSyntax: boolean;
@@ -31,6 +32,7 @@ interface WikiPasteSettings {
   autoExpandCanvasCards: boolean;
   canvasCardCopyToMarkdown: boolean;
   selectLineBeforeAll: boolean;
+  moveLinesWithAltArrows: boolean;
   showPasteOptionsPopup: boolean;
   pasteWebContentAsHtml: boolean;
 }
@@ -45,6 +47,7 @@ const DEFAULT_SETTINGS: WikiPasteSettings = {
   autoExpandCanvasCards: true,
   canvasCardCopyToMarkdown: true,
   selectLineBeforeAll: true,
+  moveLinesWithAltArrows: true,
   showPasteOptionsPopup: false,
   pasteWebContentAsHtml: false,
 };
@@ -62,6 +65,7 @@ export default class WikiPastePlugin extends Plugin {
       autoExpandCanvasCards: savedSettings?.autoExpandCanvasCards ?? DEFAULT_SETTINGS.autoExpandCanvasCards,
       canvasCardCopyToMarkdown: savedSettings?.canvasCardCopyToMarkdown ?? DEFAULT_SETTINGS.canvasCardCopyToMarkdown,
       selectLineBeforeAll: savedSettings?.selectLineBeforeAll ?? DEFAULT_SETTINGS.selectLineBeforeAll,
+      moveLinesWithAltArrows: savedSettings?.moveLinesWithAltArrows ?? DEFAULT_SETTINGS.moveLinesWithAltArrows,
       showPasteOptionsPopup: savedSettings?.showPasteOptionsPopup ?? DEFAULT_SETTINGS.showPasteOptionsPopup,
       pasteWebContentAsHtml: savedSettings?.pasteWebContentAsHtml ?? DEFAULT_SETTINGS.pasteWebContentAsHtml,
     };
@@ -100,13 +104,23 @@ export default class WikiPastePlugin extends Plugin {
     });
 
     this.registerDomEvent(document, "keydown", (event: KeyboardEvent) => {
-      if (!this.settings.selectLineBeforeAll) {
+      if (!this.settings.selectLineBeforeAll && !this.settings.moveLinesWithAltArrows) {
         return;
       }
 
       const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
       const activeView = markdownView ? undefined : this.getCanvasView(event);
-      handleSelectLineThenAllKeydown(event, markdownView, activeView);
+
+      if (
+        this.settings.selectLineBeforeAll
+        && handleSelectLineThenAllKeydown(event, markdownView, activeView, { isMacOS: Platform.isMacOS })
+      ) {
+        return;
+      }
+
+      if (this.settings.moveLinesWithAltArrows) {
+        handleMoveSelectedLinesKeydown(event, markdownView, activeView);
+      }
     }, { capture: true });
 
     this.registerDomEvent(document, "paste", (event: ClipboardEvent) => {
@@ -185,6 +199,11 @@ export default class WikiPastePlugin extends Plugin {
 
   async setSelectLineBeforeAllEnabled(enabled: boolean): Promise<void> {
     this.settings.selectLineBeforeAll = enabled;
+    await this.saveData(this.settings);
+  }
+
+  async setMoveLinesWithAltArrowsEnabled(enabled: boolean): Promise<void> {
+    this.settings.moveLinesWithAltArrows = enabled;
     await this.saveData(this.settings);
   }
 
@@ -279,6 +298,13 @@ class WikiPasteSettingTab extends PluginSettingTab {
       .addToggle((toggle) => toggle
         .setValue(this.plugin.settings.selectLineBeforeAll)
         .onChange((enabled) => this.plugin.setSelectLineBeforeAllEnabled(enabled)));
+
+    new Setting(containerEl)
+      .setName("Move selected lines with Alt+Up/Down")
+      .setDesc("Move and swap the current line or selected lines up or down using Alt+ArrowUp and Alt+ArrowDown.")
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.moveLinesWithAltArrows)
+        .onChange((enabled) => this.plugin.setMoveLinesWithAltArrowsEnabled(enabled)));
 
     new Setting(containerEl)
       .setName("[Hack] Show paste options popup")

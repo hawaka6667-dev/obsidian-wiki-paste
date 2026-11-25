@@ -142,6 +142,22 @@ function resolvePasteTarget(
   return null;
 }
 
+export function resolveActiveCmEditor(
+  target: Element | null,
+  markdownView: MarkdownView | null,
+  activeView?: unknown,
+): Partial<Editor> | null {
+  if (!target?.closest?.(".cm-content")) {
+    return null;
+  }
+
+  if (markdownView && markdownView.containerEl.contains(target)) {
+    return markdownView.editor;
+  }
+
+  return findCanvasNodeForTarget(activeView, target)?.child?.editor ?? null;
+}
+
 export function findCanvasNodeForTarget(view: unknown, target: Element): CanvasNode | undefined {
   if (!isCanvasView(view)) {
     return undefined;

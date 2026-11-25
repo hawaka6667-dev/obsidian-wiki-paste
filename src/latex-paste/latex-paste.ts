@@ -499,8 +499,9 @@ function replaceMathElementWithPlaceholder(
   extracted.push({ token, tex: cleanedTex, display });
 
   if (display) {
-    target.insertAdjacentHTML("beforebegin", `<p>${token}</p>`);
-    target.remove();
+    const block = doc.createElementNS("http://www.w3.org/1999/xhtml", "p");
+    block.textContent = token;
+    target.replaceWith(block);
   } else {
     target.replaceWith(doc.createTextNode(token));
   }
